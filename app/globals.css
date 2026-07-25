@@ -1,30 +1,38 @@
+/* ---------------------------------------------------------------------------
+   Paleta Colsubsidio. Tomada del design system publicado en colsubsidio.com
+   (variables --color-* de su :root): azul #0067B1 y amarillo #FFD000 son los
+   colores de marca; los grises y el rojo de error son los suyos.
+   --------------------------------------------------------------------------- */
 :root {
-  --bg: #f4f6f8;
+  --bg: #f6f7fc; /* --color-gray-bg */
   --surface: #ffffff;
-  --surface-2: #f8fafb;
-  --border: #e3e8ee;
-  --border-strong: #cfd8e3;
-  --text: #16202c;
-  --muted: #5f6c7b;
-  --faint: #8a97a6;
+  --surface-2: #fafbfd; /* --color-white-two */
+  --border: #e4e7ee;
+  --border-strong: #d6d6d6; /* --color-gray-border-medium */
+  --text: #1c1c1c; /* --color-black */
+  --muted: #5c5c5c; /* --color-gray-medium */
+  --faint: #757575; /* --color-gray-two */
 
-  --primary: #00893e;
-  --primary-dark: #00702f;
-  --primary-soft: #e6f4ec;
-  --accent: #ee7203;
-  --accent-soft: #fdeede;
+  --primary: #0067b1; /* --color-blue */
+  --primary-dark: #005089;
+  --primary-soft: #e6f0f8;
+  --accent: #ffd000; /* --color-yellow */
+  /* Mismo matiz del amarillo de marca, oscurecido hasta pasar WCAG AA (4.52:1
+     sobre blanco): el #FFD000 puro es ilegible como texto. */
+  --accent-strong: #8e7400;
+  --accent-soft: #fffdf4; /* --color-yellow-bg */
 
-  --risk-bajo: #0f9d58;
-  --risk-medio: #e8a400;
-  --risk-alto: #e5484d;
-  --risk-bajo-soft: #e6f5ec;
-  --risk-medio-soft: #fbf3dc;
-  --risk-alto-soft: #fdecec;
+  --risk-bajo: #0067b1;
+  --risk-medio: #8e7400;
+  --risk-alto: #cf1132; /* --color-red */
+  --risk-bajo-soft: #e6f0f8;
+  --risk-medio-soft: #fff8dd;
+  --risk-alto-soft: #fbe8ec;
 
   --radius: 14px;
   --radius-sm: 9px;
-  --shadow: 0 1px 2px rgba(16, 32, 48, 0.04), 0 4px 16px rgba(16, 32, 48, 0.05);
-  --shadow-lg: 0 8px 30px rgba(16, 32, 48, 0.1);
+  --shadow: 0 1px 2px rgba(0, 51, 89, 0.05), 0 4px 16px rgba(0, 51, 89, 0.06);
+  --shadow-lg: 0 8px 30px rgba(0, 51, 89, 0.12);
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
 }
@@ -68,12 +76,28 @@ body {
   align-items: center;
   gap: 14px;
 }
+/* Marca de agua del prototipo: chevrones azul/amarillo, un guino al simbolo de
+   Colsubsidio sin reproducir su logo (es un prototipo, no material oficial). */
 .logo {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: var(--primary);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.logo i {
+  display: block;
+  width: 5px;
+  height: 14px;
+  background: #fff;
+  clip-path: polygon(0 0, 60% 50%, 0 100%, 40% 100%, 100% 50%, 40% 0);
+}
+.logo i:last-child {
+  background: var(--accent);
 }
 .appbar h1 {
   font-size: 16px;
@@ -109,15 +133,15 @@ body {
   gap: 10px;
   align-items: flex-start;
   background: var(--accent-soft);
-  border: 1px solid #f3d3ac;
-  color: #8a4b00;
+  border: 1px solid #ffec99; /* --color-yellow-light */
+  color: #6b5200;
   border-radius: var(--radius-sm);
   padding: 11px 14px;
   font-size: 13px;
   margin-bottom: 20px;
 }
 .disclaimer strong {
-  color: #6d3b00;
+  color: #4d3b00;
 }
 
 /* ---------- Tabs ---------- */
@@ -149,7 +173,7 @@ body {
 .tab.active {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 2px 6px rgba(0, 137, 62, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 103, 177, 0.3);
 }
 
 /* ---------- Cards ---------- */
@@ -269,15 +293,15 @@ textarea {
 }
 .badge-bajo {
   background: var(--risk-bajo-soft);
-  color: #0a7a43;
+  color: #005089;
 }
 .badge-medio {
   background: var(--risk-medio-soft);
-  color: #9a6d00;
+  color: #8a6800;
 }
 .badge-alto {
   background: var(--risk-alto-soft);
-  color: #c0292e;
+  color: #cf1132;
 }
 .dot {
   width: 7px;
@@ -321,6 +345,33 @@ textarea {
   font-weight: 600;
   text-align: right;
 }
+/* Marca si el dato lo trajo el usuario en su insumo o lo aporto el motor. */
+.data-row .origen {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  background: var(--surface-2, #eef1f5);
+  color: var(--faint);
+  border: 1px solid var(--border);
+}
+/* Modalidad debajo del producto en la tabla del lote: evita una columna extra. */
+.grid .t-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 1px;
+}
+.data-row .origen-insumo {
+  background: var(--primary-soft, #e6f0ea);
+  color: var(--primary);
+  border-color: var(--primary);
+}
 .section-label {
   font-size: 11px;
   font-weight: 700;
@@ -351,7 +402,7 @@ textarea {
   color: var(--muted);
 }
 .reco-amount b {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 17px;
 }
 
@@ -424,7 +475,7 @@ textarea {
   gap: 7px;
 }
 .chip b {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 .chip .enc {
   color: var(--faint);

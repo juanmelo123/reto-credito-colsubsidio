@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { procesarLote } from "@/lib/engine";
-import { validarCedula } from "@/lib/synthetic";
-import type { EnrichRequest, Proposito } from "@/lib/types";
+import { validarCedula, normalizarCategoria } from "@/lib/synthetic";
+import type { EnrichRequest, Proposito, RegistroEntrada } from "@/lib/types";
 
 const PROPOSITOS_VALIDOS: Proposito[] = [
   "auto",
@@ -10,10 +10,39 @@ const PROPOSITOS_VALIDOS: Proposito[] = [
   "educacion",
   "libre",
   "unificar",
+  "complementario",
   "seguros_impuestos",
 ];
 
 const MAX_CEDULAS = 5000;
+
+// Solo se aceptan los campos que el brief define como insumo. Cualquier otra
+// columna del archivo del usuario se ignora.
+function normalizarRegistro(raw: unknown): RegistroEntrada | null {
+  if (typeof raw === "string") {
+    const { normalizada } = validarCedula(raw);
+    const cedula = normalizada || raw.trim();
+    return cedula ? { cedula } : null;
+  }
+  if (!raw || typeof raw !== "object") return null;
+
+  const r = raw as Record<string, unknown>;
+  const texto = (v: unknown): string | undefined =>
+    typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : undefined;
+
+  const cedulaRaw = texto(r.cedula) ?? "";
+  const { normalizada } = validarCedula(cedulaRaw);
+  const cedula = normalizada || cedulaRaw;
+  if (!cedula) return null;
+
+  return {
+    cedula,
+    nombre: texto(r.nombre),
+    correo: texto(r.correo),
+    direccion: texto(r.direccion),
+    categoriaAfiliacion: normalizarCategoria(texto(r.categoriaAfiliacion)) ?? undefined,
+  };
+}
 
 export async function POST(req: Request) {
   let body: EnrichRequest;
@@ -23,31 +52,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  if (!body || !Array.isArray(body.cedulas)) {
+  const entrada: unknown[] = Array.isArray(body?.registros)
+    ? body.registros
+    : Array.isArray(body?.cedulas)
+      ? body.cedulas
+      : [];
+
+  if (entrada.length === 0) {
     return NextResponse.json(
-      { error: "Se espera { cedulas: string[], proposito?: string }" },
+      {
+        error:
+          "Se espera { registros: [{cedula, nombre?, correo?, direccion?, categoriaAfiliacion?}] } o { cedulas: string[] }",
+      },
       { status: 400 }
     );
   }
 
-  // Limpieza: normaliza, descarta vacios y duplicados.
+  // Limpieza: normaliza, descarta vacios y deduplica por cedula.
   const vistas = new Set<string>();
-  const cedulas: string[] = [];
-  for (const raw of body.cedulas) {
-    if (typeof raw !== "string") continue;
-    const { normalizada } = validarCedula(raw);
-    const key = normalizada || raw.trim();
-    if (!key || vistas.has(key)) continue;
-    vistas.add(key);
-    cedulas.push(key);
+  const registros: RegistroEntrada[] = [];
+  for (const raw of entrada) {
+    const reg = normalizarRegistro(raw);
+    if (!reg || vistas.has(reg.cedula)) continue;
+    vistas.add(reg.cedula);
+    registros.push(reg);
   }
 
-  if (cedulas.length === 0) {
+  if (registros.length === 0) {
     return NextResponse.json({ error: "No se recibieron cedulas validas" }, { status: 400 });
   }
-  if (cedulas.length > MAX_CEDULAS) {
+  if (registros.length > MAX_CEDULAS) {
     return NextResponse.json(
-      { error: `Maximo ${MAX_CEDULAS} cedulas por lote (se recibieron ${cedulas.length}).` },
+      { error: `Maximo ${MAX_CEDULAS} cedulas por lote (se recibieron ${registros.length}).` },
       { status: 413 }
     );
   }
@@ -55,6 +91,5 @@ export async function POST(req: Request) {
   const proposito: Proposito =
     body.proposito && PROPOSITOS_VALIDOS.includes(body.proposito) ? body.proposito : "auto";
 
-  const response = procesarLote(cedulas, proposito);
-  return NextResponse.json(response);
+  return NextResponse.json(procesarLote(registros, proposito));
 }
