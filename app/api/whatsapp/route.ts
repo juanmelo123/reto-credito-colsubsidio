@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { procesarRegistro } from "@/lib/engine";
 import { construirPropuesta } from "@/lib/propuesta";
 import { validarCedula, normalizarCategoria } from "@/lib/synthetic";
-import type { Proposito } from "@/lib/types";
+import type { Proposito, PerfilCompleto } from "@/lib/types";
 
-// Envia la propuesta de credito por WhatsApp usando Kapso (WhatsApp Cloud API).
-// Igual que el correo: el contenido NO viaja desde el cliente, se recalcula aqui
-// a partir de la cedula, para que el endpoint no sirva para mandar texto
-// arbitrario a numeros arbitrarios.
+// Envia la propuesta de credito por WhatsApp usando Kapso (WhatsApp Cloud API),
+// y justo despues un segundo mensaje de agradecimiento. Igual que el correo: el
+// contenido NO viaja desde el cliente, se recalcula aqui a partir de la cedula,
+// para que el endpoint no sirva para mandar texto arbitrario a numeros arbitrarios.
 export async function POST(req: Request) {
   const apiKey = process.env.KAPSO_API_KEY;
   const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID;
@@ -55,8 +55,37 @@ export async function POST(req: Request) {
 
   const { asunto, texto: plano } = construirPropuesta(perfil);
   // WhatsApp usa texto con formato ligero: *negrita*. El asunto va de titular.
-  const mensaje = `*${asunto}*\n\n${plano}`.slice(0, 4096);
+  const mensajeCredito = `*${asunto}*\n\n${plano}`.slice(0, 4096);
 
+  // 1) Mensaje con la informacion del credito.
+  const envioCredito = await enviarTexto(apiKey, phoneNumberId, destino, mensajeCredito);
+  if (!envioCredito.ok) {
+    return NextResponse.json({ error: envioCredito.error }, { status: envioCredito.status });
+  }
+
+  // 2) Mensaje de agradecimiento, inmediatamente despues del primero. Si este
+  //    falla no invalidamos el envio principal: lo reportamos aparte.
+  const envioGracias = await enviarTexto(apiKey, phoneNumberId, destino, mensajeGracias(perfil));
+
+  return NextResponse.json({
+    id: envioCredito.id,
+    asunto,
+    destino,
+    gracias: envioGracias.ok ? { id: envioGracias.id } : { error: envioGracias.error },
+  });
+}
+
+type EnvioResult =
+  | { ok: true; id: string | null }
+  | { ok: false; status: number; error: string };
+
+// Envia un mensaje de texto por WhatsApp via Kapso.
+async function enviarTexto(
+  apiKey: string,
+  phoneNumberId: string,
+  to: string,
+  mensaje: string
+): Promise<EnvioResult> {
   const res = await fetch(
     `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`,
     {
@@ -64,7 +93,7 @@ export async function POST(req: Request) {
       headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to: destino,
+        to,
         type: "text",
         text: { body: mensaje, preview_url: false },
       }),
@@ -79,13 +108,30 @@ export async function POST(req: Request) {
   };
 
   if (!res.ok) {
-    const msg =
+    const error =
       json.error?.message ?? json.message ?? `Kapso rechazó el envío (HTTP ${res.status})`;
-    return NextResponse.json({ error: msg }, { status: res.status });
+    return { ok: false, status: res.status, error };
   }
+  return { ok: true, id: json.messages?.[0]?.id ?? json.data?.id ?? null };
+}
 
-  const id = json.messages?.[0]?.id ?? json.data?.id ?? null;
-  return NextResponse.json({ id, destino, asunto });
+// Mensaje de agradecimiento, personalizado con el nombre y el producto sugerido.
+function mensajeGracias(perfil: PerfilCompleto): string {
+  const nombre = perfil.exogenos.nombre.split(" ")[0];
+  const r = perfil.recomendacion;
+  if (r.elegible && r.productoRecomendado) {
+    return (
+      `¡Gracias por tu interés, ${nombre}! 🙌\n\n` +
+      `Acabas de recibir la propuesta de tu *${r.nombreProducto}*. ` +
+      `Si quieres avanzar, un asesor de Colsubsidio te acompaña en todo el proceso: ` +
+      `responde a este chat cuando gustes y con gusto te ayudamos. 💚`
+    );
+  }
+  return (
+    `¡Gracias por tu interés, ${nombre}! 🙌\n\n` +
+    `Un asesor de Colsubsidio puede revisar tu caso y ayudarte a encontrar la mejor ` +
+    `alternativa para ti. Responde a este chat cuando quieras. 💚`
+  );
 }
 
 // Deja solo digitos y, para moviles colombianos de 10 digitos, antepone el 57.
