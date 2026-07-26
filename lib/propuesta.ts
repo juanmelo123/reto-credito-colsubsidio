@@ -253,10 +253,10 @@ export function construirPropuesta(perfil: PerfilCompleto): Propuesta {
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:14px;">
         ${filas
           .map(
-            ([k, v], i) => `
-        <tr style="background:${i === filas.length - 1 ? "#fffdf4" : "#fff"};">
-          <td style="padding:10px 18px;border-top:1px solid #e6ecf2;color:#4a5560;">${k}</td>
-          <td style="padding:10px 18px;border-top:1px solid #e6ecf2;text-align:right;font-weight:${i === filas.length - 1 || k === "Total a pagar" ? 800 : 600};">${v}</td>
+            ([k, v]) => `
+        <tr style="background:${k === "Total a pagar" ? "#fffdf4" : "#fff"};">
+          <td style="padding:10px 18px;border-top:1px solid #dddddd;color:#575756;">${k}</td>
+          <td style="padding:10px 18px;border-top:1px solid #dddddd;text-align:right;font-weight:${k === "Total a pagar" ? 800 : 600};">${v}</td>
         </tr>`
           )
           .join("")}
@@ -293,25 +293,34 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-const P = "margin:0 0 14px;font-size:15px;line-height:1.6;color:#243746;";
+const P = "margin:0 0 14px;font-size:15px;line-height:1.6;color:#575756;";
 const H2 =
   "margin:24px 0 8px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#0067b1;";
 
 function lista(items: string[]): string {
   return `<ul style="margin:0 0 14px;padding-left:18px;">${items
-    .map((i) => `<li style="font-size:14.5px;line-height:1.6;color:#243746;margin-bottom:6px;">${i}</li>`)
+    .map((i) => `<li style="font-size:14.5px;line-height:1.6;color:#575756;margin-bottom:6px;">${i}</li>`)
     .join("")}</ul>`;
 }
 
+// Cabecera de marca en HTML plano: azul Colsubsidio con el filete amarillo.
+// El logo va como texto, no como <img>: sin dominio publico la imagen se
+// rompe y muchos clientes bloquean remotas por defecto.
 function envoltura(nombre: string, titulo: string, cuerpo: string): string {
   return `<!doctype html><html lang="es"><body style="margin:0;background:#f4f6f8;padding:24px 12px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-<div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #e6ecf2;border-radius:14px;padding:28px;">
-  <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#0067b1;">Colsubsidio · Crédito</div>
-  <h1 style="margin:8px 0 18px;font-size:22px;line-height:1.3;color:#12212e;">Hola ${esc(nombre)}, tenemos una propuesta hecha a tu medida</h1>
+<div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #dddddd;border-radius:14px;overflow:hidden;">
+  <div style="background:#0067b1;padding:18px 28px;">
+    <div style="font-size:19px;font-weight:800;letter-spacing:-.01em;color:#ffffff;">Colsubsidio</div>
+    <div style="font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#ffd000;margin-top:2px;">Crédito</div>
+  </div>
+  <div style="height:4px;background:#ffd000;"></div>
+  <div style="padding:26px 28px 28px;">
+  <h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;color:#1c1c1c;">Hola ${esc(nombre)}, tenemos una propuesta hecha a tu medida</h1>
   ${cuerpo}
-  <p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:#6b7885;border-top:1px solid #e6ecf2;padding-top:14px;">
+  <p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:#757575;border-top:1px solid #dddddd;padding-top:14px;">
     Cifras estimadas por el motor de perfilamiento a partir de tu información; la aprobación final y las condiciones definitivas dependen del estudio de crédito. Este correo se generó automáticamente para el reto de crédito Colsubsidio.
   </p>
+  </div>
 </div>
 <div style="display:none;">${titulo}</div>
 </body></html>`;

@@ -18,7 +18,7 @@ const buttonVariants = cva(
           "bg-surface text-ink border border-line-strong hover:bg-surface-2 hover:border-faint",
         quiet: "bg-transparent text-muted hover:bg-surface-2 hover:text-ink",
         accent:
-          "bg-accent text-[#4d3b00] hover:brightness-95 shadow-sm font-bold",
+          "bg-accent text-grafito hover:brightness-95 shadow-sm font-bold",
       },
       size: {
         md: "h-11 px-5 text-sm [&_svg]:size-4",

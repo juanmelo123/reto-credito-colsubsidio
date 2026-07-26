@@ -9,33 +9,47 @@
 /* ---------------------------------------------------------------------------
    Sistema de marca Colsubsidio.
 
-   Los hex salen del design system publicado en colsubsidio.com (las variables
-   --color-* de su :root): azul #0067B1 y amarillo #FFD000 son los colores de
-   marca, y los grises y el rojo de error son los suyos.
+   Los tres colores oficiales salen del manual de marca (hoja "Colores
+   Oficiales"):
+     amarillo Colsubsidio  Pantone 109 C        #FFD000
+     azul Colsubsidio      Pantone 2196 C       #0067B1
+     grafito               Pantone Cool Gray 11 #575756
+   Los `-80/-60/-40` son los porcentajes de la misma hoja (el color mezclado
+   con blanco), no tintes inventados: 80% = color*0.8 + blanco*0.2.
 
    Se declaran como @theme para que Tailwind genere las utilidades
    (bg-brand, text-muted, border-line...) en vez de tener hex sueltos por todo
    el JSX. Cambiar la marca es cambiar este bloque.
    --------------------------------------------------------------------------- */
 @theme {
-  --color-canvas: #f6f7fc; /* --color-gray-bg */
+  --color-canvas: #f6f7fc;
   --color-surface: #ffffff;
-  --color-surface-2: #fafbfd; /* --color-white-two */
+  --color-surface-2: #fafbfd;
   --color-line: #e4e7ee;
-  --color-line-strong: #d6d6d6; /* --color-gray-border-medium */
-  --color-ink: #1c1c1c; /* --color-black */
-  --color-muted: #5c5c5c; /* --color-gray-medium */
-  --color-faint: #757575; /* --color-gray-two */
+  --color-line-strong: #bcbcbb; /* grafito 40% */
+  --color-ink: #1c1c1c;
+  --color-muted: #575756; /* grafito 100% */
+  --color-faint: #757575;
 
-  --color-brand: #0067b1; /* --color-blue */
+  --color-grafito: #575756;
+  --color-grafito-60: #9a9a9a;
+  --color-grafito-40: #bcbcbb;
+  --color-grafito-20: #dddddd;
+
+  --color-brand: #0067b1; /* azul Colsubsidio */
   --color-brand-dark: #005089;
+  --color-brand-80: #3386c0;
+  --color-brand-60: #66a4d0;
+  --color-brand-40: #99c3e0;
   --color-brand-soft: #e6f0f8;
-  --color-accent: #ffd000; /* --color-yellow */
+  --color-accent: #ffd000; /* amarillo Colsubsidio */
+  --color-accent-80: #ffd933;
+  --color-accent-60: #ffe266;
   /* Mismo matiz del amarillo de marca, oscurecido hasta pasar WCAG AA (4.52:1
      sobre blanco): el #FFD000 puro es ilegible como texto. */
   --color-accent-strong: #8e7400;
-  --color-accent-soft: #fffdf4; /* --color-yellow-bg */
-  --color-accent-line: #ffec99; /* --color-yellow-light */
+  --color-accent-soft: #fffdf4;
+  --color-accent-line: #ffec99; /* amarillo 40% */
 
   --color-riesgo-bajo: #0067b1;
   --color-riesgo-medio: #8e7400;

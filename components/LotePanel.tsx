@@ -296,7 +296,7 @@ export default function LotePanel() {
             <Card>
               <CardBody>
                 <CardTitle>Nivel de riesgo</CardTitle>
-                <DistBars data={data.resumen.distribucionRiesgo} color="#5b7fa6" />
+                <DistBars data={data.resumen.distribucionRiesgo} color="var(--color-brand-60)" />
               </CardBody>
             </Card>
           </div>

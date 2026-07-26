@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import * as Tabs from "@radix-ui/react-tabs";
 import { ShieldCheck } from "lucide-react";
 
@@ -9,38 +10,39 @@ import LotePanel from "@/components/LotePanel";
 export default function Home() {
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-3.5 px-6 py-3.5">
-          {/* Marca de agua del prototipo: chevrones azul/amarillo, un guino al
-              simbolo de Colsubsidio sin reproducir su logo — es un prototipo,
-              no material oficial. */}
-          <span
-            aria-hidden
-            className="flex size-[34px] shrink-0 items-center justify-center gap-0.5 rounded-[9px] bg-brand"
-          >
-            <i className="block h-3.5 w-[5px] bg-white [clip-path:polygon(0_0,60%_50%,0_100%,40%_100%,100%_50%,40%_0)]" />
-            <i className="block h-3.5 w-[5px] bg-accent [clip-path:polygon(0_0,60%_50%,0_100%,40%_100%,100%_50%,40%_0)]" />
-          </span>
+      {/* El logo oficial es la version para fondo oscuro (isotipo amarillo +
+          marca en blanco), por eso la barra va en azul Colsubsidio. */}
+      <header className="sticky top-0 z-20 bg-brand shadow-[0_1px_0_rgba(0,0,0,0.08)]">
+        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-6 py-3.5">
+          <Image
+            src="/marca/logo-colsubsidio.png"
+            alt="Colsubsidio"
+            width={1141}
+            height={217}
+            priority
+            className="h-6 w-auto shrink-0"
+          />
+          <span aria-hidden className="h-7 w-px shrink-0 bg-white/25" />
           <div className="min-w-0">
-            <h1 className="m-0 text-base font-bold tracking-tight">
+            <h1 className="m-0 text-base font-bold tracking-tight text-white">
               Motor de Enriquecimiento Crediticio
             </h1>
-            <p className="m-0 text-[12.5px] text-muted">
+            <p className="m-0 text-[12.5px] text-white/70">
               Reto Crédito · Hackathon Colsubsidio x 30X
             </p>
           </div>
           <div className="flex-1" />
-          <span className="hidden rounded-full bg-brand-soft px-3 py-1.5 text-[11.5px] font-semibold text-brand-dark sm:inline">
+          <span className="hidden rounded-full bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-grafito sm:inline">
             Datos sintéticos
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1180px] px-6 py-6">
-        <div className="mb-5 flex items-start gap-2.5 rounded-[var(--radius-control)] border border-accent-line bg-accent-soft px-3.5 py-3 text-[13px] text-[#6b5200]">
+        <div className="mb-5 flex items-start gap-2.5 rounded-[var(--radius-control)] border border-accent-line bg-accent-soft px-3.5 py-3 text-[13px] text-grafito">
           <ShieldCheck aria-hidden className="mt-px size-4 shrink-0" />
           <p className="m-0">
-            <strong className="font-semibold text-[#4d3b00]">
+            <strong className="font-semibold text-grafito">
               Prototipo con datos 100 % sintéticos y deterministas.
             </strong>{" "}
             No se consulta ni almacena información real de personas. Cada cédula genera un perfil
