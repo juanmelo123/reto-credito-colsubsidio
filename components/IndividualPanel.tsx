@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Loader2, Search, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Loader2, Mail, Search, Sparkles } from "lucide-react";
 
 import type { PerfilCompleto, Proposito, CampoInsumo, CategoriaAfiliacion } from "@/lib/types";
+import { planDePago } from "@/lib/propuesta";
 import { formatCOP, formatPercent } from "@/lib/format";
 import { CASOS_INDIVIDUALES } from "@/lib/demo";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,15 @@ const CATEGORIAS: { value: string; label: string }[] = [
   { value: "D", label: "D — no afiliado" },
 ];
 
+interface Consulta {
+  cedula: string;
+  proposito: Proposito;
+  nombre?: string;
+  correo?: string;
+  direccion?: string;
+  categoriaAfiliacion?: CategoriaAfiliacion;
+}
+
 export default function IndividualPanel() {
   const [cedula, setCedula] = useState("");
   const [proposito, setProposito] = useState<Proposito>("auto");
@@ -43,6 +53,7 @@ export default function IndividualPanel() {
   const [categoria, setCategoria] = useState("auto");
   const [verInsumo, setVerInsumo] = useState(false);
   const [data, setData] = useState<PerfilCompleto | null>(null);
+  const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Rota entre los casos de demostracion en vez de repetir siempre el mismo.
@@ -56,27 +67,26 @@ export default function IndividualPanel() {
     }
     setLoading(true);
     setError(null);
+    const registro = {
+      cedula: c,
+      nombre: nombre.trim() || undefined,
+      correo: correo.trim() || undefined,
+      direccion: direccion.trim() || undefined,
+      categoriaAfiliacion:
+        categoria === "auto" ? undefined : (categoria as CategoriaAfiliacion),
+    };
     try {
       const res = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          registros: [
-            {
-              cedula: c,
-              nombre: nombre.trim() || undefined,
-              correo: correo.trim() || undefined,
-              direccion: direccion.trim() || undefined,
-              categoriaAfiliacion:
-                categoria === "auto" ? undefined : (categoria as CategoriaAfiliacion),
-            },
-          ],
-          proposito,
-        }),
+        body: JSON.stringify({ registros: [registro], proposito }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error en la consulta");
       setData(json.results[0]);
+      // Se guarda el insumo exacto con el que se calculo el perfil: el correo
+      // se manda con eso, aunque despues editen los campos del formulario.
+      setConsulta({ ...registro, proposito });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado");
       setData(null);
@@ -239,14 +249,15 @@ export default function IndividualPanel() {
         </CardBody>
       </Card>
 
-      {data && <Resultado data={data} />}
+      {data && <Resultado data={data} consulta={consulta} />}
     </div>
   );
 }
 
-function Resultado({ data }: { data: PerfilCompleto }) {
+function Resultado({ data, consulta }: { data: PerfilCompleto; consulta: Consulta | null }) {
   const { exogenos: e, recomendacion: r } = data;
   const delInsumo = (campo: CampoInsumo) => e.camposDeInsumo.includes(campo);
+  const plan = r.productoRecomendado ? planDePago(r.productoRecomendado, r.montoSugerido) : null;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_1.15fr]">
@@ -357,6 +368,19 @@ function Resultado({ data }: { data: PerfilCompleto }) {
                   <Metrica valor={formatCOP(r.topeMonto)} label="Tope por capacidad" chico />
                   <Metrica valor={`${e.scoreBuro}`} label="Score buró" />
                 </div>
+
+                {plan && (
+                  <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    <Metrica valor={formatCOP(plan.cuota)} label="Cuota mensual" chico />
+                    <Metrica valor={`${plan.plazoMeses} meses`} label="Plazo" chico />
+                    <Metrica
+                      valor={formatPercent(plan.tasaMensual, 2)}
+                      label="Tasa mensual"
+                      chico
+                    />
+                    <Metrica valor={formatCOP(plan.totalAPagar)} label="Total a pagar" chico />
+                  </div>
+                )}
               </>
             ) : (
               <div className="rounded-[var(--radius-control)] border border-riesgo-alto/30 bg-riesgo-alto-soft p-4">
@@ -387,11 +411,88 @@ function Resultado({ data }: { data: PerfilCompleto }) {
                 </ul>
               </>
             )}
+
+            {consulta && (
+              <EnviarPropuesta key={e.cedula} consulta={consulta} correoPerfil={e.correo} />
+            )}
           </CardBody>
         </Card>
 
         <AfinidadPortafolio productos={r.productos} recomendado={r.productoRecomendado} />
       </div>
+    </div>
+  );
+}
+
+// El correo se arma en el servidor con la misma cedula: aqui solo se elige el
+// destinatario. El del perfil es sintetico, por eso se puede sobrescribir.
+function EnviarPropuesta({
+  consulta,
+  correoPerfil,
+}: {
+  consulta: Consulta;
+  correoPerfil: string;
+}) {
+  const [destino, setDestino] = useState(correoPerfil);
+  const [estado, setEstado] = useState<"idle" | "enviando" | "ok">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function enviar() {
+    setEstado("enviando");
+    setError(null);
+    try {
+      const res = await fetch("/api/propuesta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...consulta, destino: destino.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "No se pudo enviar");
+      setEstado("ok");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+      setEstado("idle");
+    }
+  }
+
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <Seccion titulo="Enviar propuesta" />
+      <p className="mb-2 text-[12.5px] text-faint">
+        Correo personalizado con el producto recomendado, la cuota, el total a pagar y cómo
+        aprovecharlo según esta situación.
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[220px] flex-1">
+          <Label htmlFor="destino">Destinatario</Label>
+          <Input
+            id="destino"
+            type="email"
+            value={destino}
+            onChange={(ev) => {
+              setDestino(ev.target.value);
+              setEstado("idle");
+            }}
+          />
+        </div>
+        <Button onClick={enviar} disabled={estado === "enviando" || !destino.trim()}>
+          {estado === "enviando" ? (
+            <Loader2 aria-hidden className="animate-spin" />
+          ) : estado === "ok" ? (
+            <Check aria-hidden />
+          ) : (
+            <Mail aria-hidden />
+          )}
+          {estado === "enviando" ? "Enviando..." : estado === "ok" ? "Enviado" : "Enviar por correo"}
+        </Button>
+      </div>
+      {error ? (
+        <FieldHint error className="mt-2">
+          {error}
+        </FieldHint>
+      ) : estado === "ok" ? (
+        <FieldHint className="mt-2">Propuesta enviada a {destino}.</FieldHint>
+      ) : null}
     </div>
   );
 }

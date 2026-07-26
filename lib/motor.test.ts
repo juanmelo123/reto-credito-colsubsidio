@@ -5,7 +5,8 @@ import { SMMLV, TOPE_HASTA_1_SMMLV, TOPE_MULTIPLO_SALARIO, LIMITES_PRODUCTO } fr
 import { topePorCapacidad, modalidadDe, evaluar, montoPorCuota } from "./decision";
 import { generarExogenos, generarCedulasEjemplo, normalizarCategoria } from "./synthetic";
 import { parsearInsumo, ALIAS, normalizarEncabezado } from "./insumo";
-import { procesarLote } from "./engine";
+import { procesarLote, procesarCedula } from "./engine";
+import { planDePago, construirPropuesta } from "./propuesta";
 import { LOTE_DEMO, loteDemoComoCsv } from "./demo";
 import type { ProductoId } from "./types";
 
@@ -445,4 +446,30 @@ test("el resumen cuenta los registros que traian datos del usuario", () => {
     { cedula: "52830147" },
   ]);
   assert.equal(resumen.camposDeInsumo, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Propuesta comercial: el plan de pago que va en el correo.
+// ---------------------------------------------------------------------------
+
+test("el plan de pago es la inversa exacta del monto por cuota", () => {
+  const monto = montoPorCuota(500_000, "libre_inversion");
+  const plan = planDePago("libre_inversion", monto);
+  assert.ok(Math.abs(plan.cuota - 500_000) < 1, `cuota ${plan.cuota} != 500.000`);
+  // El total a pagar es cuota x plazo y siempre supera al capital.
+  assert.ok(Math.abs(plan.totalAPagar - plan.cuota * plan.plazoMeses) < 1);
+  assert.ok(plan.intereses > 0 && Math.abs(plan.totalAPagar - monto - plan.intereses) < 1);
+});
+
+test("la propuesta trae las cifras del perfil, no texto generico", () => {
+  const perfil = procesarCedula("15148524");
+  const { asunto, texto } = construirPropuesta(perfil);
+  assert.ok(asunto.includes(perfil.exogenos.nombre.split(" ")[0]!));
+  assert.ok(texto.includes("Total a pagar"));
+  assert.ok(texto.includes(perfil.exogenos.ciudad));
+  // Perfil no elegible: el correo explica que falta, no ofrece un monto.
+  const rechazado = procesarCedula("123");
+  assert.ok(!rechazado.recomendacion.elegible);
+  assert.ok(!construirPropuesta(rechazado).texto.includes("Total a pagar"));
+  assert.ok(construirPropuesta(rechazado).asunto.includes("lo que falta"));
 });
