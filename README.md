@@ -13,6 +13,58 @@ crédito** del portafolio Colsubsidio con **monto, modalidad y score explicable*
 
 ---
 
+## Features
+
+| | |
+| --- | --- |
+| **Enriquecimiento exógeno** | De una cédula sale un perfil completo: contacto y redes, vínculo laboral, antigüedad, ingreso estimado, categoría A–D, score de buró, entidades con deuda, saldo, cuota, mora, embargos y actividad económica. |
+| **Respeto del insumo** | Los 5 campos del brief que el usuario suba **no se sintetizan**. Cada dato se marca en la UI como `insumo` o `enriquecido`, y el CSV exportado lleva la trazabilidad. |
+| **Afinidad explicable por producto** | Los 8 productos del portafolio, siempre, con su % de afinidad y el desglose criterio por criterio: qué cumple, qué no, y cuánto pesa cada uno. |
+| **Bloqueos con motivo** | Un producto que no se puede otorgar dice por qué (*"Crédito Mujer: bloqueado por afiliación vigente"*), en vez de desaparecer de la lista. |
+| **Reglas del brief** | Tope de $1.500.000 hasta 1 SMMLV y 3× el salario por encima; DTI máximo 40 %; antigüedad mínima por tipo de vínculo; modalidad libranza / no libranza / cupo. |
+| **Lote de 2.000+** | Tabla ordenable, distribuciones agregadas, export CSV enriquecido y detalle de afinidad por afiliado sin salir de la tabla. |
+| **Lote de demostración** | 54 casos curados que cubren los 8 productos, los dos topes y los tres motivos de rechazo. Un clic. |
+| **Tres superficies** | UI, `POST /api/enrich`, CLI (`pnpm --silent reto`) y servidor MCP. Todas llaman a la misma función. |
+| **Skill para agentes** | Un agente opera el motor y analiza cartera: a quién priorizar, oportunidad de compra de cartera en COP, concentración de riesgo. |
+| **31 tests** | Sin framework (`node:test`). Cubren las reglas de monto, la coherencia de la afinidad y que la demo no quede coja al calibrar. |
+
+## Por qué esta solución
+
+**El número y su explicación son el mismo cálculo.** Es la decisión de diseño que sostiene todo
+lo demás. Un motor que devuelve "afinidad 88%" y aparte un párrafo escrito a mano *va a mentir*
+apenas alguien toque una regla. Acá cada producto declara su cliente objetivo como criterios con
+peso y `afinidad = puntos cumplidos / puntos posibles`: el %, el orden del portafolio y el texto
+que lee el analista salen de la misma estructura y no se pueden desincronizar. Cambiar un peso
+mueve las tres cosas a la vez.
+
+**Muestra lo que descartó, no solo lo que eligió.** Cualquier motor puede decir "ofrecele un cupo
+rotativo". Este dice además que el hipotecario daba 78% y se cayó por antigüedad, y que el Crédito
+Mujer daría 88% pero está bloqueado por afiliación. Eso convierte una recomendación en una
+**conversación accionable**: el asesor sabe qué gestionar para abrir el siguiente producto.
+
+**Las reglas de crédito viven en un solo lugar.** `constants.ts` y `criterios.ts` concentran toda
+la política; la UI, el CLI, la API y el MCP son envoltorios sobre `procesarLote`. No hay una regla
+en el frontend que contradiga al backend, y calibrar la política es editar una tabla, no cazar
+condicionales por el código.
+
+**Es defendible frente a un jurado de riesgo.** El monto descuenta la tasa (valor presente de la
+anualidad, no `cuota × plazo`, que a 180 meses sobreestima casi al triple). El sobreendeudamiento
+se mide por DTI y no por conteo de entidades. Un perfil rechazado no puede mostrar productos
+disponibles. Cada una de esas tres es un error que el motor cometía antes y que hoy tiene un test
+que lo impide.
+
+**Es defendible frente a legal.** Datos 100 % sintéticos y deterministas: cero PII real, cero
+scraping de personas identificadas, Habeas Data intacto. Y como la fuente vive detrás de la
+interfaz `ProveedorExogenos`, enchufar un buró real es implementar una interfaz —no reescribir el
+motor.
+
+**Sirve a un agente, no solo a una pantalla.** El CLI y el MCP exponen el mismo motor con salida
+estructurada, y los lotes devuelven filas compactas a propósito: 2.000 registros con los criterios
+de los 8 productos cada uno no caben útiles en el contexto de un modelo. La skill documenta cómo
+leerlos y trae las recetas de análisis ya escritas.
+
+---
+
 ## Qué hace
 
 1. **Lee el insumo del usuario.** Los cinco campos del brief —cédula, nombre, correo, dirección
