@@ -40,8 +40,8 @@ export const DTI_ALERTA = 0.35; // A partir de aqui se considera senal de sobree
 // Antiguedad laboral minima segun vinculo (meses) - tomado del brief y del sitio.
 export const ANTIGUEDAD_MINIMA: Record<string, number> = {
   Indefinido: 2,
-  "Termino fijo": 6,
-  "Prestacion de servicios": 6,
+  "Término fijo": 6,
+  "Prestación de servicios": 6,
   Independiente: 12,
   Pensionado: 6,
 };
@@ -58,28 +58,28 @@ export const LIMITES_PRODUCTO: Record<
   cupo_rotativo: {
     min: 150_000,
     max: 5_000_000,
-    nombre: "Cupo de credito rotativo",
+    nombre: "Cupo de crédito rotativo",
     plazoMeses: 12,
     tasaMensual: 0.021,
   },
   libre_inversion: {
     min: 500_000,
     max: 150_000_000,
-    nombre: "Credito de libre inversion",
+    nombre: "Crédito de libre inversión",
     plazoMeses: 60,
     tasaMensual: 0.0175,
   },
   hipotecario: {
     min: 20_000_000,
     max: 800_000_000,
-    nombre: "Credito hipotecario",
+    nombre: "Crédito hipotecario",
     plazoMeses: 180,
     tasaMensual: 0.0105,
   },
   educativo: {
     min: 300_000,
     max: 60_000_000,
-    nombre: "Credito educativo",
+    nombre: "Crédito educativo",
     plazoMeses: 48,
     tasaMensual: 0.0125,
   },
@@ -93,14 +93,14 @@ export const LIMITES_PRODUCTO: Record<
   credito_mujer: {
     min: 500_000,
     max: 30_000_000,
-    nombre: "Credito Mujer",
+    nombre: "Crédito Mujer",
     plazoMeses: 48,
     tasaMensual: 0.0165,
   },
   complementario: {
     min: 300_000,
     max: 20_000_000,
-    nombre: "Credito complementario",
+    nombre: "Crédito complementario",
     plazoMeses: 36,
     tasaMensual: 0.018,
   },

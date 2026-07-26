@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as EnrichRequest;
   } catch {
-    return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
   const entrada: unknown[] = Array.isArray(body?.registros)
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Se espera { registros: [{cedula, nombre?, correo?, direccion?, categoriaAfiliacion?}] } o { cedulas: string[] }",
+          "Se espera { registros: [{cédula, nombre?, correo?, dirección?, categoriaAfiliacion?}] } o { cédulas: string[] }",
       },
       { status: 400 }
     );
@@ -79,11 +79,11 @@ export async function POST(req: Request) {
   }
 
   if (registros.length === 0) {
-    return NextResponse.json({ error: "No se recibieron cedulas validas" }, { status: 400 });
+    return NextResponse.json({ error: "No se recibieron cédulas validas" }, { status: 400 });
   }
   if (registros.length > MAX_CEDULAS) {
     return NextResponse.json(
-      { error: `Maximo ${MAX_CEDULAS} cedulas por lote (se recibieron ${registros.length}).` },
+      { error: `Máximo ${MAX_CEDULAS} cédulas por lote (se recibieron ${registros.length}).` },
       { status: 413 }
     );
   }

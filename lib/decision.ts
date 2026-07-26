@@ -43,7 +43,7 @@ export function topePorCapacidad(ingresoMensual: number): number {
 // La libranza exige pagaduria (descuento de nomina o de mesada pensional).
 const CONTRATOS_CON_PAGADURIA: ReadonlySet<TipoContrato> = new Set<TipoContrato>([
   "Indefinido",
-  "Termino fijo",
+  "Término fijo",
   "Pensionado",
 ]);
 
@@ -81,19 +81,19 @@ export function evaluar(
 
   if (!e.cedulaValida) {
     elegible = false;
-    alertas.push("Cedula con formato invalido: no se puede verificar identidad.");
+    alertas.push("Cédula con formato inválido: no se puede verificar identidad.");
   }
   if (e.antiguedadMeses < antiguedadMinima) {
     elegible = false;
     alertas.push(
-      `Antiguedad de ${e.antiguedadMeses} meses no cumple el minimo de ${antiguedadMinima} para vinculo "${e.tipoContrato}".`
+      `Antigüedad de ${e.antiguedadMeses} meses no cumple el mínimo de ${antiguedadMinima} para vínculo "${e.tipoContrato}".`
     );
   }
   if (e.moraDias >= 60) {
     elegible = false;
-    alertas.push(`Mora activa de ${e.moraDias} dias: no elegible para credito nuevo.`);
+    alertas.push(`Mora activa de ${e.moraDias} días: no elegible para crédito nuevo.`);
   } else if (e.moraDias > 0) {
-    alertas.push(`Mora leve de ${e.moraDias} dias: revisar antes de aprobar.`);
+    alertas.push(`Mora leve de ${e.moraDias} días: revisar antes de aprobar.`);
   }
   if (e.embargos) {
     alertas.push("Reporta embargos vigentes: restringe varios productos.");
@@ -104,7 +104,7 @@ export function evaluar(
   const capacidadCuota = Math.max(0, e.ingresoEstimado * MAX_DTI - e.cuotaMensualDeudas);
 
   razones.push(
-    `Ingreso estimado ${money(e.ingresoEstimado)} (${(e.ingresoEstimado / SMMLV).toFixed(1)} SMMLV) -> categoria ${e.categoriaAfiliacion}.`
+    `Ingreso estimado ${money(e.ingresoEstimado)} (${(e.ingresoEstimado / SMMLV).toFixed(1)} SMMLV) -> categoría ${e.categoriaAfiliacion}.`
   );
   if (e.cuotaMensualDeudas > 0) {
     razones.push(
@@ -128,7 +128,7 @@ export function evaluar(
 
   const sobreendeudado = dti >= DTI_ALERTA && e.entidadesConDeuda >= 2;
   if (sobreendeudado) {
-    alertas.push(`Senal de sobreendeudamiento (DTI ${(dti * 100).toFixed(0)}%).`);
+    alertas.push(`Señal de sobreendeudamiento (DTI ${(dti * 100).toFixed(0)}%).`);
   }
 
   // --- 3. SCORE DE APROBACION (0-100) ---------------------------------------
@@ -160,7 +160,7 @@ export function evaluar(
   }
 
   if (e.genero === "F" && e.embargos) {
-    alertas.push("Credito Mujer no disponible: reporta embargos.");
+    alertas.push("Crédito Mujer no disponible: reporta embargos.");
   }
 
   const aplicables = productos.filter((p) => p.aplica);
@@ -174,11 +174,11 @@ export function evaluar(
     recomendado = aplicables.find((p) => p.id === objetivo);
     if (recomendado) {
       razones.push(
-        `Producto alineado al proposito declarado ("${LABEL_PROPOSITO[proposito]}"), afinidad ${recomendado.afinidad}%.`
+        `Producto alineado al propósito declarado ("${LABEL_PROPOSITO[proposito]}"), afinidad ${recomendado.afinidad}%.`
       );
     } else {
       razones.push(
-        `El proposito "${LABEL_PROPOSITO[proposito]}" no encaja con el perfil; se sugiere la mejor alternativa.`
+        `El propósito "${LABEL_PROPOSITO[proposito]}" no encaja con el perfil; se sugiere la mejor alternativa.`
       );
     }
   }
@@ -190,7 +190,7 @@ export function evaluar(
     return {
       elegible: true,
       productoRecomendado: null,
-      nombreProducto: "Sin oferta automatica",
+      nombreProducto: "Sin oferta automática",
       montoSugerido: 0,
       score,
       nivelRiesgo,
@@ -212,7 +212,7 @@ export function evaluar(
   razones.push(motivoProducto(recomendado.id, e, dti, sobreendeudado));
   if (recomendado.topeAplicado) {
     razones.push(
-      `Monto recortado al tope por capacidad de pago (${money(topeMonto)}); la cuota daba para mas.`
+      `Monto recortado al tope por capacidad de pago (${money(topeMonto)}); la cuota daba para más.`
     );
   }
 
@@ -322,13 +322,13 @@ const PROPOSITO_A_PRODUCTO: Record<Exclude<Proposito, "auto">, ProductoId> = {
 };
 
 const LABEL_PROPOSITO: Record<Proposito, string> = {
-  auto: "Automatico",
+  auto: "Automático",
   consumo: "Consumo",
   vivienda: "Vivienda",
-  educacion: "Educacion",
-  libre: "Libre inversion",
+  educacion: "Educación",
+  libre: "Libre inversión",
   unificar: "Unificar deudas",
-  complementario: "Credito complementario",
+  complementario: "Crédito complementario",
   seguros_impuestos: "Seguros e impuestos",
 };
 
@@ -345,16 +345,16 @@ function motivoProducto(
         : `Compra de cartera atractiva: puede consolidar ${e.entidadesConDeuda} creditos externos y mejorar plazo/tasa.`;
     case "libre_inversion":
       return e.entidadesConDeuda === 0
-        ? "Libre inversion: perfil sin historial tradicional, producto que Colsubsidio otorga aun sin vida crediticia, con desembolso directo."
-        : "Libre inversion: buena capacidad y score para un desembolso directo de ticket medio-alto.";
+        ? "Libre inversión: perfil sin historial tradicional, producto que Colsubsidio otorga aún sin vida crediticia, con desembolso directo."
+        : "Libre inversión: buena capacidad y score para un desembolso directo de ticket medio-alto.";
     case "hipotecario":
-      return `Perfil con capacidad e ingreso (categoria ${e.categoriaAfiliacion}) apto para financiacion de vivienda a largo plazo.`;
+      return `Perfil con capacidad e ingreso (categoría ${e.categoriaAfiliacion}) apto para financiación de vivienda a largo plazo.`;
     case "educativo":
-      return "Credito educativo: monto accesible para financiar formacion; encaja con el perfil de edad/ingreso.";
+      return "Crédito educativo: monto accesible para financiar formación; encaja con el perfil de edad/ingreso.";
     case "credito_mujer":
-      return "Credito Mujer: cumple edad, ingreso, afiliacion vigente y ausencia de embargos; incluye beneficios adicionales.";
+      return "Crédito Mujer: cumple edad, ingreso, afiliación vigente y ausencia de embargos; incluye beneficios adicionales.";
     case "complementario":
-      return `Credito complementario: afiliado al dia con ${e.entidadesConDeuda} obligacion(es) y DTI ${(dti * 100).toFixed(0)}%; admite una linea adicional sin comprometer la capacidad.`;
+      return `Crédito complementario: afiliado al día con ${e.entidadesConDeuda} obligación(es) y DTI ${(dti * 100).toFixed(0)}%; admite una línea adicional sin comprometer la capacidad.`;
     case "cupo_rotativo":
       return `Cupo rotativo: DTI ${(dti * 100).toFixed(0)}% permite un cupo reutilizable para consumo recurrente.`;
     case "rotativo_seguros_impuestos":

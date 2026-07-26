@@ -15,13 +15,13 @@ import AfinidadPortafolio from "./AfinidadPortafolio";
 import { RiskBadge, ScoreGauge } from "./shared";
 
 const PROPOSITOS: { value: Proposito; label: string }[] = [
-  { value: "auto", label: "Automatico (mayor afinidad)" },
+  { value: "auto", label: "Automático (mayor afinidad)" },
   { value: "consumo", label: "Consumo / compras" },
-  { value: "libre", label: "Libre inversion" },
+  { value: "libre", label: "Libre inversión" },
   { value: "vivienda", label: "Vivienda" },
-  { value: "educacion", label: "Educacion" },
+  { value: "educacion", label: "Educación" },
   { value: "unificar", label: "Unificar deudas" },
-  { value: "complementario", label: "Credito complementario" },
+  { value: "complementario", label: "Crédito complementario" },
   { value: "seguros_impuestos", label: "Seguros e impuestos" },
 ];
 
@@ -29,7 +29,7 @@ const CATEGORIAS: { value: string; label: string }[] = [
   { value: "auto", label: "Inferir del ingreso" },
   { value: "A", label: "A — hasta 2 SMMLV" },
   { value: "B", label: "B — de 2 a 4 SMMLV" },
-  { value: "C", label: "C — mas de 4 SMMLV" },
+  { value: "C", label: "C — más de 4 SMMLV" },
   { value: "D", label: "D — no afiliado" },
 ];
 
@@ -51,7 +51,7 @@ export default function IndividualPanel() {
   async function consultar(cedulaOverride?: string) {
     const c = (cedulaOverride ?? cedula).trim();
     if (!c) {
-      setError("Ingresa una cedula para consultar.");
+      setError("Ingresa una cédula para consultar.");
       return;
     }
     setLoading(true);
@@ -106,7 +106,7 @@ export default function IndividualPanel() {
         <CardBody>
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[240px] flex-1">
-              <Label htmlFor="ced">Cedula</Label>
+              <Label htmlFor="ced">Cédula</Label>
               <Input
                 id="ced"
                 inputMode="numeric"
@@ -124,7 +124,7 @@ export default function IndividualPanel() {
             </div>
 
             <div className="min-w-[220px] flex-1">
-              <Label htmlFor="prop">Proposito del credito</Label>
+              <Label htmlFor="prop">Propósito del crédito</Label>
               <Select value={proposito} onValueChange={(v) => setProposito(v as Proposito)}>
                 <SelectTrigger id="prop" className="group">
                   <SelectValue />
@@ -152,7 +152,7 @@ export default function IndividualPanel() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button variant="ghost" size="sm" onClick={cargarDemo} disabled={loading}>
               <Sparkles aria-hidden />
-              Usar datos de demostracion
+              Usar datos de demostración
             </Button>
             <span className="text-[12px] text-faint">{siguienteDemo.titulo}</span>
 
@@ -200,7 +200,7 @@ export default function IndividualPanel() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="in-dir">Direccion</Label>
+                  <Label htmlFor="in-dir">Dirección</Label>
                   <Input
                     id="in-dir"
                     value={direccion}
@@ -209,7 +209,7 @@ export default function IndividualPanel() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="in-cat">Categoria de afiliacion</Label>
+                  <Label htmlFor="in-cat">Categoría de afiliación</Label>
                   <Select value={categoria} onValueChange={setCategoria}>
                     <SelectTrigger id="in-cat" className="group">
                       <SelectValue />
@@ -233,7 +233,7 @@ export default function IndividualPanel() {
             </FieldHint>
           ) : (
             <FieldHint className="mt-3">
-              Datos sinteticos y deterministas: la misma cedula devuelve siempre el mismo perfil.
+              Datos sintéticos y deterministas: la misma cédula devuelve siempre el mismo perfil.
             </FieldHint>
           )}
         </CardBody>
@@ -253,7 +253,7 @@ function Resultado({ data }: { data: PerfilCompleto }) {
       {/* --- Perfil enriquecido --- */}
       <Card className="h-fit">
         <CardBody>
-          <CardTitle>Perfil enriquecido · variables exogenas</CardTitle>
+          <CardTitle>Perfil enriquecido · variables exógenas</CardTitle>
           {e.camposDeInsumo.length > 0 && (
             <p className="-mt-2 mb-3 text-[12.5px] text-faint">
               {e.camposDeInsumo.length} campo(s) vienen de tu insumo y se respetaron tal cual.
@@ -264,16 +264,16 @@ function Resultado({ data }: { data: PerfilCompleto }) {
           <dl className="flex flex-col">
             <Row k="Nombre" v={e.nombre} insumo={delInsumo("nombre")} />
             <Row
-              k="Cedula"
+              k="Cédula"
               v={`${e.cedula}${e.cedulaValida ? "" : " (formato invalido)"}`}
               insumo
             />
             <Row
-              k="Edad / Genero"
-              v={`${e.edad} anios · ${e.genero === "F" ? "Femenino" : "Masculino"}`}
+              k="Edad / Género"
+              v={`${e.edad} años · ${e.genero === "F" ? "Femenino" : "Masculino"}`}
             />
             <Row k="Ciudad" v={e.ciudad} />
-            <Row k="Direccion" v={e.direccion} insumo={delInsumo("direccion")} />
+            <Row k="Dirección" v={e.direccion} insumo={delInsumo("direccion")} />
             <Row k="Correo" v={e.correo} insumo={delInsumo("correo")} />
             <Row k="Instagram" v={e.instagram ?? "No detectado"} />
             <Row k="LinkedIn" v={e.linkedin ? "Perfil detectado" : "No detectado"} />
@@ -281,12 +281,12 @@ function Resultado({ data }: { data: PerfilCompleto }) {
 
           <Seccion titulo="Laboral e ingreso" />
           <dl className="flex flex-col">
-            <Row k="Vinculo" v={e.tipoContrato} />
-            <Row k="Antiguedad" v={`${e.antiguedadMeses} meses`} />
+            <Row k="Vínculo" v={e.tipoContrato} />
+            <Row k="Antigüedad" v={`${e.antiguedadMeses} meses`} />
             <Row k="Ingreso estimado" v={formatCOP(e.ingresoEstimado)} />
             <Row
-              k="Categoria afiliacion"
-              v={e.afiliado ? `Categoria ${e.categoriaAfiliacion}` : "No afiliado (D)"}
+              k="Categoría afiliación"
+              v={e.afiliado ? `Categoría ${e.categoriaAfiliacion}` : "No afiliado (D)"}
               insumo={delInsumo("categoriaAfiliacion")}
             />
             {e.tipoContrato === "Independiente" && (
@@ -303,13 +303,13 @@ function Resultado({ data }: { data: PerfilCompleto }) {
             )}
           </dl>
 
-          <Seccion titulo="Senales de mercado" />
+          <Seccion titulo="Señales de mercado" />
           <dl className="flex flex-col">
-            <Row k="Score de buro (sim.)" v={`${e.scoreBuro} / 950`} />
+            <Row k="Score de buró (sim.)" v={`${e.scoreBuro} / 950`} />
             <Row k="Entidades con deuda" v={`${e.entidadesConDeuda}`} />
             <Row k="Saldo deuda externa" v={formatCOP(e.saldoDeudaExterna)} />
             <Row k="Cuota mensual deudas" v={formatCOP(e.cuotaMensualDeudas)} />
-            <Row k="Estado de pago" v={e.moraDias === 0 ? "Al dia" : `Mora ${e.moraDias} dias`} />
+            <Row k="Estado de pago" v={e.moraDias === 0 ? "Al día" : `Mora ${e.moraDias} días`} />
             <Row k="Embargos" v={e.embargos ? "Si reporta" : "No"} />
           </dl>
         </CardBody>
@@ -319,7 +319,7 @@ function Resultado({ data }: { data: PerfilCompleto }) {
       <div className="flex flex-col gap-5">
         <Card>
           <CardBody>
-            <CardTitle>Recomendacion del motor</CardTitle>
+            <CardTitle>Recomendación del motor</CardTitle>
 
             {r.elegible && r.productoRecomendado ? (
               <>
@@ -355,7 +355,7 @@ function Resultado({ data }: { data: PerfilCompleto }) {
                     chico
                   />
                   <Metrica valor={formatCOP(r.topeMonto)} label="Tope por capacidad" chico />
-                  <Metrica valor={`${e.scoreBuro}`} label="Score buro" />
+                  <Metrica valor={`${e.scoreBuro}`} label="Score buró" />
                 </div>
               </>
             ) : (
@@ -368,7 +368,7 @@ function Resultado({ data }: { data: PerfilCompleto }) {
               </div>
             )}
 
-            <Seccion titulo="Por que" />
+            <Seccion titulo="Por qué" />
             <ul className="flex flex-col">
               {r.razones.map((rz, i) => (
                 <Punto key={i}>{rz}</Punto>
@@ -453,7 +453,7 @@ function Row({ k, v, insumo }: { k: string; v: string; insumo?: boolean }) {
             title={
               insumo
                 ? "Dato que trajiste en tu insumo"
-                : "Variable exogena aportada por el motor"
+                : "Variable exógena aportada por el motor"
             }
           >
             {insumo ? "insumo" : "enriquecido"}

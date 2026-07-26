@@ -13,7 +13,7 @@ import type { RegistroEntrada } from "./types";
 // ---------------------------------------------------------------------------
 
 // Nombres de columna que se aceptan para cada campo del brief.
-const ALIAS: Record<string, keyof RegistroEntrada> = {
+export const ALIAS: Record<string, keyof RegistroEntrada> = {
   cedula: "cedula",
   cedulas: "cedula",
   documento: "cedula",
@@ -39,7 +39,7 @@ const ALIAS: Record<string, keyof RegistroEntrada> = {
   "categoria afiliado": "categoriaAfiliacion",
 };
 
-function normalizarEncabezado(s: string): string {
+export function normalizarEncabezado(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")

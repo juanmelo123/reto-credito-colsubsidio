@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Motor de Enriquecimiento Crediticio — Reto Colsubsidio x 30X",
   description:
-    "Prototipo que enriquece perfiles a partir de la cedula con variables exogenas sinteticas y recomienda un producto de credito del portafolio Colsubsidio.",
+    "Prototipo que enriquece perfiles a partir de la cédula con variables exógenas sintéticas y recomienda un producto de crédito del portafolio Colsubsidio.",
 };
 
 export default function RootLayout({

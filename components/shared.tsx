@@ -39,7 +39,7 @@ export function ScoreGauge({ score }: { score: number }) {
         viewBox="0 0 74 74"
         className="-rotate-90"
         role="img"
-        aria-label={`Score de aprobacion ${score} sobre 100`}
+        aria-label={`Score de aprobación ${score} sobre 100`}
       >
         <circle cx="37" cy="37" r={r} fill="none" stroke="var(--color-line)" strokeWidth="7" />
         <circle

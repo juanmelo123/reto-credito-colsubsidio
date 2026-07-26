@@ -21,36 +21,36 @@ import type {
 // ---------------------------------------------------------------------------
 
 const NOMBRES_F = [
-  "Maria", "Luz", "Ana", "Sandra", "Diana", "Paula", "Laura", "Carolina",
-  "Andrea", "Claudia", "Marcela", "Angela", "Patricia", "Johana", "Daniela",
+  "María", "Luz", "Ana", "Sandra", "Diana", "Paula", "Laura", "Carolina",
+  "Andrea", "Claudia", "Marcela", "Ángela", "Patricia", "Johana", "Daniela",
   "Camila", "Valentina", "Natalia", "Gloria", "Adriana", "Yolanda", "Liliana",
 ];
 const NOMBRES_M = [
-  "Juan", "Carlos", "Andres", "Luis", "Jorge", "Diego", "Julian", "Santiago",
-  "David", "Fabian", "Oscar", "Cristian", "Sergio", "Mauricio", "Nicolas",
-  "Felipe", "Miguel", "Wilson", "Alexander", "German", "Ivan", "Ricardo",
+  "Juan", "Carlos", "Andrés", "Luis", "Jorge", "Diego", "Julián", "Santiago",
+  "David", "Fabián", "Óscar", "Cristian", "Sergio", "Mauricio", "Nicolás",
+  "Felipe", "Miguel", "Wilson", "Alexander", "Germán", "Iván", "Ricardo",
 ];
 const APELLIDOS = [
-  "Rodriguez", "Gomez", "Gonzalez", "Martinez", "Lopez", "Garcia", "Perez",
-  "Sanchez", "Ramirez", "Torres", "Diaz", "Vargas", "Castro", "Rojas",
-  "Moreno", "Munoz", "Gutierrez", "Rivera", "Jimenez", "Herrera", "Medina",
-  "Castaneda", "Cardenas", "Ospina", "Quintero", "Suarez", "Mejia", "Cortes",
+  "Rodríguez", "Gómez", "González", "Martínez", "López", "García", "Pérez",
+  "Sánchez", "Ramírez", "Torres", "Díaz", "Vargas", "Castro", "Rojas",
+  "Moreno", "Muñoz", "Gutiérrez", "Rivera", "Jiménez", "Herrera", "Medina",
+  "Castañeda", "Cárdenas", "Ospina", "Quintero", "Suárez", "Mejía", "Cortés",
 ];
 const CIUDADES = [
-  { nombre: "Bogota", peso: 30 },
-  { nombre: "Medellin", peso: 14 },
+  { nombre: "Bogotá", peso: 30 },
+  { nombre: "Medellín", peso: 14 },
   { nombre: "Cali", peso: 11 },
   { nombre: "Barranquilla", peso: 8 },
   { nombre: "Cartagena", peso: 5 },
   { nombre: "Bucaramanga", peso: 5 },
   { nombre: "Soacha", peso: 5 },
-  { nombre: "Cucuta", peso: 4 },
+  { nombre: "Cúcuta", peso: 4 },
   { nombre: "Pereira", peso: 4 },
-  { nombre: "Ibague", peso: 3 },
+  { nombre: "Ibagué", peso: 3 },
   { nombre: "Manizales", peso: 3 },
   { nombre: "Villavicencio", peso: 3 },
   { nombre: "Neiva", peso: 3 },
-  { nombre: "Zipaquira", peso: 2 },
+  { nombre: "Zipaquirá", peso: 2 },
 ];
 
 const DOMINIOS = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com"];
@@ -175,8 +175,8 @@ export function generarExogenos(
   // Vinculo laboral (pensionados mas frecuentes en edades altas).
   const tipoContrato: TipoContrato = rng.weighted<TipoContrato>([
     { value: "Indefinido", weight: edad > 60 ? 15 : 34 },
-    { value: "Termino fijo", weight: 22 },
-    { value: "Prestacion de servicios", weight: 16 },
+    { value: "Término fijo", weight: 22 },
+    { value: "Prestación de servicios", weight: 16 },
     { value: "Independiente", weight: 20 },
     { value: "Pensionado", weight: edad > 58 ? 30 : 4 },
   ]);

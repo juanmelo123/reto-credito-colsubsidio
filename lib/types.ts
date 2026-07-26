@@ -4,10 +4,13 @@ export type Genero = "F" | "M";
 
 export type CategoriaAfiliacion = "A" | "B" | "C" | "D";
 
+// Valor de salida que se muestra tal cual en pantalla y en el CSV, nunca entra
+// por la API: por eso lleva tilde. Los tipos que SI son contrato de entrada
+// (`Proposito`, `CampoInsumo`) se quedan en ASCII a proposito.
 export type TipoContrato =
   | "Indefinido"
-  | "Termino fijo"
-  | "Prestacion de servicios"
+  | "Término fijo"
+  | "Prestación de servicios"
   | "Independiente"
   | "Pensionado";
 

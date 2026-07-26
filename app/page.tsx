@@ -26,12 +26,12 @@ export default function Home() {
               Motor de Enriquecimiento Crediticio
             </h1>
             <p className="m-0 text-[12.5px] text-muted">
-              Reto Credito · Hackathon Colsubsidio x 30X
+              Reto Crédito · Hackathon Colsubsidio x 30X
             </p>
           </div>
           <div className="flex-1" />
           <span className="hidden rounded-full bg-brand-soft px-3 py-1.5 text-[11.5px] font-semibold text-brand-dark sm:inline">
-            Datos sinteticos
+            Datos sintéticos
           </span>
         </div>
       </header>
@@ -41,10 +41,10 @@ export default function Home() {
           <ShieldCheck aria-hidden className="mt-px size-4 shrink-0" />
           <p className="m-0">
             <strong className="font-semibold text-[#4d3b00]">
-              Prototipo con datos 100% sinteticos y deterministas.
+              Prototipo con datos 100 % sintéticos y deterministas.
             </strong>{" "}
-            No se consulta ni almacena informacion real de personas. Cada cedula genera un perfil
-            simulado, reproducible, que emula lo que devolveria un buro o una fuente externa
+            No se consulta ni almacena información real de personas. Cada cédula genera un perfil
+            simulado, reproducible, que emula lo que devolvería un buró o una fuente externa
             (Habeas Data — Ley 1581).
           </p>
         </div>
@@ -68,9 +68,9 @@ export default function Home() {
       </main>
 
       <footer className="px-6 pb-10 pt-8 text-center text-[12.5px] text-faint">
-        Prototipo demostrativo · El portafolio (cupo rotativo, libre inversion, hipotecario,
-        educativo, compra de cartera, credito mujer, complementario, seguros e impuestos) y las
-        categorias A–D siguen el brief del reto. Motores de datos y decision configurables en{" "}
+        Prototipo demostrativo · El portafolio (cupo rotativo, libre inversión, hipotecario,
+        educativo, compra de cartera, crédito mujer, complementario, seguros e impuestos) y las
+        categorías A–D siguen el brief del reto. Motores de datos y decisión configurables en{" "}
         <code className="rounded bg-surface-2 px-1 py-px">/lib</code>.
       </footer>
     </>

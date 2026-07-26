@@ -17,22 +17,22 @@ import AfinidadPortafolio from "./AfinidadPortafolio";
 import { RiskBadge, DistBars } from "./shared";
 
 const PROPOSITOS: { value: Proposito; label: string }[] = [
-  { value: "auto", label: "Automatico (mayor afinidad)" },
+  { value: "auto", label: "Automático (mayor afinidad)" },
   { value: "consumo", label: "Consumo / compras" },
-  { value: "libre", label: "Libre inversion" },
+  { value: "libre", label: "Libre inversión" },
   { value: "vivienda", label: "Vivienda" },
-  { value: "educacion", label: "Educacion" },
+  { value: "educacion", label: "Educación" },
   { value: "unificar", label: "Unificar deudas" },
-  { value: "complementario", label: "Credito complementario" },
+  { value: "complementario", label: "Crédito complementario" },
   { value: "seguros_impuestos", label: "Seguros e impuestos" },
 ];
 
 const LABEL_COLUMNA: Record<string, string> = {
-  cedula: "cedula",
+  cedula: "cédula",
   nombre: "nombre",
   correo: "correo",
-  direccion: "direccion",
-  categoriaAfiliacion: "categoria",
+  direccion: "dirección",
+  categoriaAfiliacion: "categoría",
 };
 
 type SortKey =
@@ -88,7 +88,7 @@ export default function LotePanel() {
   async function procesar() {
     const { registros } = insumo;
     if (registros.length === 0) {
-      setError("No se detectaron cedulas (numeros de 6 a 10 digitos) en el insumo.");
+      setError("No se detectaron cédulas (números de 6 a 10 dígitos) en el insumo.");
       return;
     }
     setLoading(true);
@@ -174,13 +174,13 @@ export default function LotePanel() {
       <Card>
         <CardBody>
           <Label htmlFor="lote">
-            Insumo: lista de cedulas, o CSV con encabezado (cedula, nombre, correo, direccion,
-            categoria). Las columnas que traigas se respetan; el resto se enriquece.
+            Insumo: lista de cédulas, o CSV con encabezado (cédula, nombre, correo, dirección,
+            categoría). Las columnas que traigas se respetan; el resto se enriquece.
           </Label>
           <Textarea
             id="lote"
             placeholder={
-              "cedula,nombre,correo,direccion,categoria\n1024587963,...\n\n(o solo cedulas, una por linea)"
+              "cédula,nombre,correo,dirección,categoría\n1024587963,...\n\n(o solo cédulas, una por línea)"
             }
             value={texto}
             aria-invalid={Boolean(error) || undefined}
@@ -194,7 +194,7 @@ export default function LotePanel() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button variant="accent" size="sm" onClick={() => cargar(loteDemoComoCsv())}>
               <Sparkles aria-hidden />
-              Cargar lote de demostracion
+              Cargar lote de demostración
             </Button>
             <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
               <Upload aria-hidden />
@@ -227,7 +227,7 @@ export default function LotePanel() {
 
             <div className="w-[240px]">
               <Select value={proposito} onValueChange={(v) => setProposito(v as Proposito)}>
-                <SelectTrigger className="group h-9 text-[13px]" aria-label="Proposito del credito">
+                <SelectTrigger className="group h-9 text-[13px]" aria-label="Propósito del crédito">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,7 +250,7 @@ export default function LotePanel() {
             {error ?? (
               <>
                 {fileName ? `Archivo: ${fileName} · ` : ""}
-                {insumo.registros.length} cedula(s) detectada(s) en el insumo.
+                {insumo.registros.length} cédula(s) detectada(s) en el insumo.
                 {columnasExtra.length > 0
                   ? ` Columnas propias respetadas: ${columnasExtra
                       .map((c) => LABEL_COLUMNA[c] ?? c)
@@ -289,7 +289,7 @@ export default function LotePanel() {
             </Card>
             <Card>
               <CardBody>
-                <CardTitle>Categoria</CardTitle>
+                <CardTitle>Categoría</CardTitle>
                 <DistBars data={data.resumen.distribucionCategoria} color="var(--color-accent)" />
               </CardBody>
             </Card>
@@ -337,7 +337,7 @@ export default function LotePanel() {
               <table className="w-full min-w-[960px] border-collapse text-[13.5px]">
                 <thead>
                   <tr>
-                    <Th k="cedula" cur={sortKey} dir={sortDir} onClick={toggleSort}>Cedula</Th>
+                    <Th k="cedula" cur={sortKey} dir={sortDir} onClick={toggleSort}>Cédula</Th>
                     <Th k="nombre" cur={sortKey} dir={sortDir} onClick={toggleSort}>Nombre</Th>
                     <Th k="categoria" cur={sortKey} dir={sortDir} onClick={toggleSort}>Cat.</Th>
                     <Th k="ingreso" cur={sortKey} dir={sortDir} onClick={toggleSort} num>Ingreso est.</Th>

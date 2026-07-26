@@ -70,22 +70,22 @@ function criteriosBase(id: ProductoId, e: DatosExogenos, ctx: ContextoDecision):
     c(
       10,
       e.cedulaValida,
-      "Cedula con formato valido",
+      "Cédula con formato válido",
       e.cedulaValida ? `${e.cedula}` : `${e.cedula}: no se puede verificar identidad`,
       true
     ),
     c(
       12,
       e.antiguedadMeses >= antiguedadMinima,
-      `Antiguedad minima del vinculo (${antiguedadMinima} meses para "${e.tipoContrato}")`,
+      `Antigüedad mínima del vínculo (${antiguedadMinima} meses para "${e.tipoContrato}")`,
       `${e.antiguedadMeses} meses`,
       true
     ),
     c(
       12,
       e.moraDias < 60,
-      "Sin mora vigente de 60 dias o mas",
-      e.moraDias === 0 ? "Al dia con el sistema" : `Mora de ${e.moraDias} dias`,
+      "Sin mora vigente de 60 días o más",
+      e.moraDias === 0 ? "Al día con el sistema" : `Mora de ${e.moraDias} días`,
       true
     ),
     c(
@@ -100,7 +100,7 @@ function criteriosBase(id: ProductoId, e: DatosExogenos, ctx: ContextoDecision):
     c(
       15,
       monto >= lim.min,
-      `Monto alcanza el minimo del producto (${money(lim.min)})`,
+      `Monto alcanza el mínimo del producto (${money(lim.min)})`,
       monto >= lim.min
         ? `Financiable ${money(monto)}`
         : `Solo financiable ${money(monto)} con la capacidad actual`,
@@ -118,7 +118,7 @@ function criteriosPropios(
   const { dti } = ctx;
   const pctDti = `${(dti * 100).toFixed(0)}%`;
   const sinMora = e.moraDias === 0;
-  const textoMora = sinMora ? "Al dia con el sistema" : `Mora de ${e.moraDias} dias`;
+  const textoMora = sinMora ? "Al día con el sistema" : `Mora de ${e.moraDias} días`;
 
   switch (id) {
     // Producto de entrada: consumo recurrente de ticket chico.
@@ -129,24 +129,24 @@ function criteriosPropios(
         c(
           20,
           e.categoriaAfiliacion === "A" || e.categoriaAfiliacion === "B",
-          "Categoria A o B",
-          `Categoria ${e.categoriaAfiliacion}`
+          "Categoría A o B",
+          `Categoría ${e.categoriaAfiliacion}`
         ),
-        c(15, e.scoreBuro >= 600, "Score de buro >= 600", `Buro ${e.scoreBuro}`),
+        c(15, e.scoreBuro >= 600, "Score de buró >= 600", `Buró ${e.scoreBuro}`),
         c(
           15,
           e.ingresoEstimado <= SMMLV * 4,
           "Ingreso hasta 4 SMMLV (encaja el ticket chico)",
           `Ingreso ${money(e.ingresoEstimado)} (${enSMMLV(e.ingresoEstimado)})`
         ),
-        c(12, e.antiguedadMeses >= 12, "Antiguedad laboral >= 12 meses", `${e.antiguedadMeses} meses`),
+        c(12, e.antiguedadMeses >= 12, "Antigüedad laboral >= 12 meses", `${e.antiguedadMeses} meses`),
       ];
 
     // Ticket medio-alto y desembolso directo, incluso sin vida crediticia.
     case "libre_inversion":
       return [
         c(15, sinMora, "Sin mora vigente", textoMora, true),
-        c(20, e.scoreBuro >= 650, "Score de buro >= 650", `Buro ${e.scoreBuro}`),
+        c(20, e.scoreBuro >= 650, "Score de buró >= 650", `Buró ${e.scoreBuro}`),
         c(
           15,
           e.ingresoEstimado > SMMLV * 2,
@@ -158,10 +158,10 @@ function criteriosPropios(
           e.entidadesConDeuda === 0,
           "Sin obligaciones vigentes: Colsubsidio presta sin historial",
           e.entidadesConDeuda === 0
-            ? "No reporta creditos con otras entidades"
+            ? "No reporta créditos con otras entidades"
             : `${e.entidadesConDeuda} entidad(es) con deuda vigente`
         ),
-        c(15, e.antiguedadMeses >= 12, "Antiguedad laboral >= 12 meses", `${e.antiguedadMeses} meses`),
+        c(15, e.antiguedadMeses >= 12, "Antigüedad laboral >= 12 meses", `${e.antiguedadMeses} meses`),
       ];
 
     // Ticket alto a 15 anos: exige respaldo y horizonte laboral.
@@ -170,21 +170,21 @@ function criteriosPropios(
         c(
           12,
           e.categoriaAfiliacion === "B" || e.categoriaAfiliacion === "C",
-          "Categoria B o C",
-          `Categoria ${e.categoriaAfiliacion}`,
+          "Categoría B o C",
+          `Categoría ${e.categoriaAfiliacion}`,
           true
         ),
-        c(12, e.scoreBuro >= 600, "Score de buro >= 600", `Buro ${e.scoreBuro}`, true),
+        c(12, e.scoreBuro >= 600, "Score de buró >= 600", `Buró ${e.scoreBuro}`, true),
         c(8, !e.embargos, "Sin embargos vigentes", e.embargos ? "Reporta embargos" : "Sin embargos", true),
         // Un credito a 15 anos no se otorga sobre un vinculo recien estrenado,
         // por corta que sea la antiguedad minima general del contrato.
-        c(10, e.antiguedadMeses >= 12, "Antiguedad laboral >= 12 meses", `${e.antiguedadMeses} meses`, true),
-        c(18, e.edad < 50, "Edad bajo 50 (el plazo llega a 180 meses)", `${e.edad} anos`),
-        c(15, e.antiguedadMeses >= 36, "Antiguedad laboral >= 36 meses", `${e.antiguedadMeses} meses`),
+        c(10, e.antiguedadMeses >= 12, "Antigüedad laboral >= 12 meses", `${e.antiguedadMeses} meses`, true),
+        c(18, e.edad < 50, "Edad bajo 50 (el plazo llega a 180 meses)", `${e.edad} años`),
+        c(15, e.antiguedadMeses >= 36, "Antigüedad laboral >= 36 meses", `${e.antiguedadMeses} meses`),
         c(
           15,
           e.tipoContrato === "Indefinido" || e.tipoContrato === "Pensionado",
-          "Vinculo estable con pagaduria",
+          "Vínculo estable con pagaduría",
           e.tipoContrato
         ),
       ];
@@ -192,17 +192,17 @@ function criteriosPropios(
     // La senal es la etapa formativa.
     case "educativo":
       return [
-        c(30, e.edad <= 30, "Edad hasta 30 (etapa formativa)", `${e.edad} anos`),
-        c(15, e.edad <= 35, "Edad hasta 35", `${e.edad} anos`),
+        c(30, e.edad <= 30, "Edad hasta 30 (etapa formativa)", `${e.edad} años`),
+        c(15, e.edad <= 35, "Edad hasta 35", `${e.edad} años`),
         c(
           15,
           e.categoriaAfiliacion === "A" || e.categoriaAfiliacion === "B",
-          "Categoria A o B (subsidio educativo)",
-          `Categoria ${e.categoriaAfiliacion}`
+          "Categoría A o B (subsidio educativo)",
+          `Categoría ${e.categoriaAfiliacion}`
         ),
         c(10, sinMora, "Sin mora vigente", textoMora),
-        c(10, e.antiguedadMeses >= 6, "Antiguedad laboral >= 6 meses", `${e.antiguedadMeses} meses`),
-        c(10, e.scoreBuro >= 550, "Score de buro >= 550", `Buro ${e.scoreBuro}`),
+        c(10, e.antiguedadMeses >= 6, "Antigüedad laboral >= 6 meses", `${e.antiguedadMeses} meses`),
+        c(10, e.scoreBuro >= 550, "Score de buró >= 550", `Buró ${e.scoreBuro}`),
       ];
 
     // Razon de ser puramente exogena: deuda repartida en varias entidades.
@@ -211,19 +211,19 @@ function criteriosPropios(
         c(
           20,
           e.entidadesConDeuda >= 2,
-          "Deuda en 2 o mas entidades",
+          "Deuda en 2 o más entidades",
           `${e.entidadesConDeuda} entidad(es), saldo ${money(e.saldoDeudaExterna)}`,
           true
         ),
         c(
           30,
           dti >= DTI_ALERTA,
-          `Senal de sobreendeudamiento (DTI >= ${Math.round(DTI_ALERTA * 100)}%)`,
+          `Señal de sobreendeudamiento (DTI >= ${Math.round(DTI_ALERTA * 100)}%)`,
           `DTI actual ${pctDti}`
         ),
-        c(10, e.entidadesConDeuda >= 3, "Deuda dispersa en 3 o mas entidades", `${e.entidadesConDeuda} entidad(es)`),
+        c(10, e.entidadesConDeuda >= 3, "Deuda dispersa en 3 o más entidades", `${e.entidadesConDeuda} entidad(es)`),
         c(15, sinMora, "Sin mora vigente (unificar antes de caer en mora)", textoMora),
-        c(15, e.scoreBuro >= 500, "Score de buro >= 500", `Buro ${e.scoreBuro}`),
+        c(15, e.scoreBuro >= 500, "Score de buró >= 500", `Buró ${e.scoreBuro}`),
       ];
 
     // Producto objetivo: requisitos verificables del sitio de Colsubsidio.
@@ -234,7 +234,7 @@ function criteriosPropios(
           8,
           e.edad >= CREDITO_MUJER.edadMin && e.edad <= CREDITO_MUJER.edadMax,
           `Edad entre ${CREDITO_MUJER.edadMin} y ${CREDITO_MUJER.edadMax}`,
-          `${e.edad} anos`,
+          `${e.edad} años`,
           true
         ),
         c(
@@ -244,35 +244,35 @@ function criteriosPropios(
           `${money(e.ingresoEstimado)} (${enSMMLV(e.ingresoEstimado)})`,
           true
         ),
-        c(10, e.afiliado, "Afiliacion vigente a Colsubsidio", e.afiliado ? "Afiliada vigente" : "No afiliada (categoria D)", true),
+        c(10, e.afiliado, "Afiliación vigente a Colsubsidio", e.afiliado ? "Afiliada vigente" : "No afiliada (categoría D)", true),
         c(8, !e.embargos, "Sin embargos vigentes", e.embargos ? "Reporta embargos" : "Sin embargos", true),
         c(15, dti < DTI_ALERTA, `DTI bajo el ${Math.round(DTI_ALERTA * 100)}%`, `DTI actual ${pctDti}`),
         c(
           15,
           e.tieneNegocio,
-          "Actividad economica propia (emprendimiento)",
+          "Actividad económica propia (emprendimiento)",
           e.tieneNegocio
             ? e.presenciaDigitalNegocio
               ? "Negocio propio con presencia digital verificable"
               : "Negocio propio"
-            : "Sin actividad economica propia detectada"
+            : "Sin actividad económica propia detectada"
         ),
       ];
 
     // Linea adicional para el afiliado que ya se mueve sano en el mercado.
     case "complementario":
       return [
-        c(15, e.afiliado, "Afiliacion vigente a Colsubsidio", e.afiliado ? "Afiliado vigente" : "No afiliado (categoria D)", true),
+        c(15, e.afiliado, "Afiliación vigente a Colsubsidio", e.afiliado ? "Afiliado vigente" : "No afiliado (categoría D)", true),
         c(12, sinMora, "Sin mora vigente", textoMora, true),
         c(
           25,
           e.entidadesConDeuda >= 1 && e.entidadesConDeuda <= 2,
-          "Entre 1 y 2 obligaciones vigentes al dia",
+          "Entre 1 y 2 obligaciones vigentes al día",
           `${e.entidadesConDeuda} entidad(es) con deuda`
         ),
         c(15, dti < DTI_ALERTA, `DTI bajo el ${Math.round(DTI_ALERTA * 100)}%`, `DTI actual ${pctDti}`),
-        c(10, e.antiguedadMeses >= 24, "Antiguedad laboral >= 24 meses", `${e.antiguedadMeses} meses`),
-        c(8, e.scoreBuro >= 650, "Score de buro >= 650", `Buro ${e.scoreBuro}`),
+        c(10, e.antiguedadMeses >= 24, "Antigüedad laboral >= 24 meses", `${e.antiguedadMeses} meses`),
+        c(8, e.scoreBuro >= 650, "Score de buró >= 650", `Buró ${e.scoreBuro}`),
       ];
 
     // La senal es tener que pagar predial, vehiculo o polizas.
@@ -282,23 +282,23 @@ function criteriosPropios(
           12,
           e.categoriaAfiliacion !== "D",
           "Afiliado a la caja",
-          e.categoriaAfiliacion === "D" ? "No afiliado (categoria D)" : `Categoria ${e.categoriaAfiliacion}`,
+          e.categoriaAfiliacion === "D" ? "No afiliado (categoría D)" : `Categoría ${e.categoriaAfiliacion}`,
           true
         ),
         c(
           25,
           e.categoriaAfiliacion === "C",
-          "Categoria C (patrimonio con predial / vehiculo / polizas)",
-          `Categoria ${e.categoriaAfiliacion}`
+          "Categoría C (patrimonio con predial / vehículo / pólizas)",
+          `Categoría ${e.categoriaAfiliacion}`
         ),
         c(
           20,
           e.tieneNegocio,
-          "Actividad economica propia (obligaciones tributarias)",
-          e.tieneNegocio ? "Negocio propio" : "Sin actividad economica propia detectada"
+          "Actividad económica propia (obligaciones tributarias)",
+          e.tieneNegocio ? "Negocio propio" : "Sin actividad económica propia detectada"
         ),
         c(15, sinMora, "Sin mora vigente", textoMora),
-        c(10, e.scoreBuro >= 550, "Score de buro >= 550", `Buro ${e.scoreBuro}`),
+        c(10, e.scoreBuro >= 550, "Score de buró >= 550", `Buró ${e.scoreBuro}`),
       ];
   }
 }

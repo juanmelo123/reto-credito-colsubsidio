@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { SMMLV, TOPE_HASTA_1_SMMLV, TOPE_MULTIPLO_SALARIO, LIMITES_PRODUCTO } from "./constants";
 import { topePorCapacidad, modalidadDe, evaluar, montoPorCuota } from "./decision";
 import { generarExogenos, generarCedulasEjemplo, normalizarCategoria } from "./synthetic";
-import { parsearInsumo } from "./insumo";
+import { parsearInsumo, ALIAS, normalizarEncabezado } from "./insumo";
 import { procesarLote } from "./engine";
 import { LOTE_DEMO, loteDemoComoCsv } from "./demo";
 import type { ProductoId } from "./types";
@@ -89,7 +89,7 @@ test("modalidad: con pagaduria es libranza, sin pagaduria no libranza, rotativos
   assert.equal(modalidadDe("libre_inversion", "Indefinido"), "Libranza");
   assert.equal(modalidadDe("libre_inversion", "Pensionado"), "Libranza");
   assert.equal(modalidadDe("libre_inversion", "Independiente"), "No libranza");
-  assert.equal(modalidadDe("libre_inversion", "Prestacion de servicios"), "No libranza");
+  assert.equal(modalidadDe("libre_inversion", "Prestación de servicios"), "No libranza");
   assert.equal(modalidadDe("cupo_rotativo", "Indefinido"), "Cupo");
   assert.equal(modalidadDe("rotativo_seguros_impuestos", "Independiente"), "Cupo");
 });
@@ -227,7 +227,7 @@ test("antiguedad por debajo del minimo del vinculo deja no elegible", () => {
   const base = generarExogenos("1024587963");
   // Indefinido exige 2 meses; termino fijo exige 6.
   assert.equal(
-    evaluar({ ...base, tipoContrato: "Termino fijo", antiguedadMeses: 3, moraDias: 0 }).elegible,
+    evaluar({ ...base, tipoContrato: "Término fijo", antiguedadMeses: 3, moraDias: 0 }).elegible,
     false
   );
   assert.equal(
@@ -294,7 +294,9 @@ test("la ciudad se toma de la direccion del insumo cuando la nombra", () => {
     cedula: "52830147",
     direccion: "Calle 93 # 15 - 20, Bogota",
   });
-  assert.equal(e.ciudad, "Bogota");
+  // El insumo viene sin tilde y la ciudad se resuelve igual: el matcheo
+  // normaliza, porque nadie escribe "Bogotá" con tilde en un CSV.
+  assert.equal(e.ciudad, "Bogotá");
   // Una direccion sin ciudad reconocible deja la ciudad enriquecida.
   const sinCiudad = generarExogenos("52830147", { cedula: "52830147", direccion: "Calle 93 # 15" });
   assert.equal(sinCiudad.ciudad, generarExogenos("52830147").ciudad);
@@ -342,6 +344,36 @@ test("acepta separador punto y coma y alias de encabezado", () => {
 test("una lista pelada de cedulas sigue funcionando y deduplica", () => {
   const { registros } = parsearInsumo("1024587963\n52830147\n1024587963\n");
   assert.deepEqual(registros.map((r) => r.cedula), ["1024587963", "52830147"]);
+});
+
+test("un encabezado con tildes encuentra la columna igual", () => {
+  // El usuario escribe "Dirección" y "Categoría" en su Excel: si el alias no
+  // matchea, la columna se pierde en silencio y el dato se sintetiza como si
+  // nunca hubiera venido.
+  const csv = ["Cédula;Nombre completo;Dirección de residencia;Categoría de afiliación",
+               "1024587963;Laura R;Calle 93 # 15-20;B"].join("\n");
+  const { registros, columnasDetectadas } = parsearInsumo(csv);
+  assert.equal(registros.length, 1);
+  assert.equal(registros[0].direccion, "Calle 93 # 15-20");
+  assert.equal(registros[0].categoriaAfiliacion, "B");
+  assert.deepEqual(columnasDetectadas.sort(), [
+    "categoriaAfiliacion",
+    "cedula",
+    "direccion",
+    "nombre",
+  ]);
+});
+
+test("todo alias de columna esta escrito como lo deja el normalizador", () => {
+  // Un alias con tilde o mayuscula es codigo muerto: nunca puede coincidir con
+  // la salida de normalizarEncabezado, que quita tildes y baja a minusculas.
+  for (const alias of Object.keys(ALIAS)) {
+    assert.equal(
+      normalizarEncabezado(alias),
+      alias,
+      `el alias "${alias}" nunca va a matchear: normaliza a "${normalizarEncabezado(alias)}"`
+    );
+  }
 });
 
 test("normalizarCategoria acepta variantes y descarta basura", () => {
