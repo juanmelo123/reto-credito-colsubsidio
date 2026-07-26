@@ -24,7 +24,11 @@ crédito** del portafolio Colsubsidio con **monto, modalidad y score explicable*
    - Laboral/ingreso: vínculo, antigüedad, ingreso estimado, categoría de afiliación (A–D).
    - Señales de mercado: score de buró, entidades con deuda, saldo y cuota de deuda externa,
      mora, embargos, actividad económica del independiente.
-3. **Decide** con un árbol de negocio:
+3. **Puntúa la afinidad de los 8 productos.** Cada producto declara su cliente objetivo como
+   criterios con peso, y `afinidad = puntos cumplidos / puntos posibles`. Se evalúan **siempre
+   los 8**, incluso para un perfil no elegible: el que incumple un criterio **bloqueante** sale
+   marcado como no disponible con el motivo a la vista, en vez de desaparecer de la lista.
+4. **Decide** con un árbol de negocio:
    - **Filtros duros**: cédula, antigüedad mínima por tipo de vínculo, mora, embargos.
    - **Capacidad de pago**: DTI actual y cuota adicional disponible (`MAX_DTI = 40 %`).
    - **Tope de monto del brief**: hasta 1 SMMLV → $1.500.000 por libranza; por encima →
@@ -32,12 +36,19 @@ crédito** del portafolio Colsubsidio con **monto, modalidad y score explicable*
      lo fija la deuda que se compra).
    - **Modalidad**: libranza (con pagaduría), no libranza o cupo (rotativos).
    - **Score de aprobación** 0–100 y nivel de riesgo (Bajo/Medio/Alto).
-   - **Asignación de producto** entre los 8 del portafolio.
-4. **Explica**: cada recomendación trae las razones y alertas que la sustentan, incluido cuándo
+   - **Asignación de producto**: gana la mayor afinidad entre los que aplican; a igual afinidad,
+     el producto más específico le gana al genérico.
+5. **Explica**: cada recomendación trae las razones y alertas que la sustentan, incluido cuándo
    el monto se recortó por el tope de capacidad.
 
 ## Decisiones de modelo que vale la pena mirar
 
+- **La afinidad y su explicación son el mismo cálculo.** No hay una narrativa escrita aparte que
+  pueda contradecir al número: si dice 88%, los criterios dicen exactamente cuáles 12 puntos
+  faltaron. Cambiar un peso mueve el %, el orden del portafolio y el texto a la vez.
+- **`aplica: false` no es baja afinidad.** Un producto bloqueado puede tener afinidad más alta
+  que uno disponible, y eso es información útil: *"Crédito Mujer daría 88%, pero está bloqueado
+  por afiliación vigente"* es lo que le dice al asesor qué gestionar.
 - **El monto descuenta la tasa.** `montoPorCuota()` calcula el valor presente de la anualidad
   (`VP = cuota × (1 − (1+i)^−n) / i`) en vez de multiplicar cuota × plazo, que a 180 meses
   sobreestima el monto casi al triple.
@@ -51,18 +62,46 @@ crédito** del portafolio Colsubsidio con **monto, modalidad y score explicable*
 
 ## Cómo correrlo
 
+Este repo usa **pnpm**. No mezclar con npm: rompe el lockfile.
+
 ```bash
 pnpm install
 pnpm dev      # http://localhost:3000
-pnpm test     # 22 tests del motor (node:test, sin framework)
+pnpm test     # 31 tests del motor (node:test, sin framework)
 ```
 
-- **Consulta individual**: escribe una cédula y, opcionalmente, los datos que ya tengas.
-  Casos de ejemplo: `1028404676` (compra de cartera), `1051570194` (ingreso bajo 1 SMMLV →
-  tope de $1.500.000), `1022383083` (hipotecario) y `28247876` (Crédito Mujer).
-- **Consulta por lote**: pega cédulas, usa "Ejemplo CSV con columnas" o sube tu archivo.
-  Devuelve tabla ordenable, distribuciones agregadas y **exporta un CSV enriquecido** de 26
-  columnas con trazabilidad de qué campos vinieron del insumo.
+- **Consulta individual**: escribe una cédula y, opcionalmente, los datos que ya tengas. El botón
+  **"Usar datos de demostración"** rota entre los casos interesantes: `15148524` (hipotecario,
+  afinidad 100%), `7974362414` (sobreendeudado → compra de cartera), `4587361827` (Crédito Mujer,
+  cumple los 7 criterios), `8118886664` (ingreso de 1 SMMLV → tope de $1.500.000) y `4988327556`
+  (no elegible por mora).
+- **Consulta por lote**: **"Cargar lote de demostración"** trae 54 casos curados que cubren los 8
+  productos, los dos topes del brief y los tres motivos de rechazo. También acepta pegar cédulas o
+  subir tu CSV. Devuelve tabla ordenable, distribuciones agregadas y **exporta un CSV enriquecido**
+  con trazabilidad de qué campos vinieron del insumo. Clic en una fila para ver la afinidad de ese
+  afiliado con los 8 productos.
+
+## Para agentes: CLI, MCP y skill
+
+Los tres caminos llaman a la misma `procesarLote`, así que la UI y un agente no pueden dar
+respuestas distintas.
+
+```bash
+# CLI (JSON a stdout). --silent no es opcional: sin el, pnpm ensucia el pipe con su banner.
+pnpm --silent reto perfil 15148524
+pnpm --silent reto lote afiliados.csv --proposito unificar
+pnpm --silent reto demo --resumen | jq '.distribucionProducto'
+
+# Servidor MCP sobre stdio (ya declarado en .mcp.json)
+pnpm mcp
+```
+
+El MCP expone `perfilar_cedula`, `procesar_lote`, `lote_demo` y `politica_credito`. Los lotes
+devuelven filas compactas por defecto: 2.000 registros con los criterios de los 8 productos cada
+uno no caben útil en el contexto de un agente.
+
+`.claude/skills/reto-credito/SKILL.md` documenta cómo leer la afinidad y trae recetas de análisis
+de cartera (a quién priorizar, oportunidad de compra de cartera en COP, concentración de riesgo).
 
 ## API
 
@@ -87,12 +126,17 @@ Devuelve `results[]` (perfil + recomendación) y un `resumen` agregado.
 | Archivo          | Responsabilidad                                                          |
 | ---------------- | ------------------------------------------------------------------------ |
 | `constants.ts`   | SMMLV, umbrales A–D, `MAX_DTI`, tope del brief, antigüedad, límites y tasa por producto |
+| `criterios.ts`   | **El cliente objetivo de cada producto**: criterios, pesos y cuáles bloquean |
 | `insumo.ts`      | Lectura del CSV del usuario (delimitadores, alias de columna)             |
 | `proveedor.ts`   | **Costura de fuentes**: interfaz `ProveedorExogenos` que hoy resuelve sintético |
 | `synthetic.ts`   | Proveedor sintético determinista por cédula                               |
+| `demo.ts`        | Lote curado de 54 casos y cédulas de ejemplo del panel individual          |
 | `decision.ts`    | Motor de decisión: filtros, DTI, tope, modalidad, score, producto         |
 | `engine.ts`      | Orquesta enriquecimiento + decisión y arma el resumen del lote            |
 | `motor.test.ts`  | Tests del motor                                                          |
+
+Al calibrar pesos o umbrales, `pnpm test` avisa si los 8 productos dejan de poder ganar o si el
+lote demo queda cojo: mejor enterarse antes de la demo que durante.
 
 > `SMMLV = $1.750.905` (Decreto 1469 del 29-dic-2025). Es el parámetro que arrastra las
 > categorías A–D y todos los montos: revísalo cada año en `constants.ts`.

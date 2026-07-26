@@ -125,6 +125,29 @@ test("se evaluan los 8 productos incluso cuando el perfil no es elegible", () =>
   );
 });
 
+test("un perfil no elegible no muestra ningun producto como disponible", () => {
+  const cedulas = generarCedulasEjemplo(500);
+  const { results } = procesarLote(cedulas.map((cedula) => ({ cedula })));
+  const noElegibles = results.filter((r) => !r.recomendacion.elegible);
+  assert.ok(noElegibles.length > 0, "el lote de prueba deberia traer no elegibles");
+
+  for (const { exogenos: e, recomendacion: r } of noElegibles) {
+    // Decir "no elegible" arriba y ofrecer un producto al 92% abajo es la
+    // contradiccion que un analista no puede defender frente al afiliado.
+    const disponibles = r.productos.filter((p) => p.aplica);
+    assert.deepEqual(
+      disponibles.map((p) => p.id),
+      [],
+      `${e.cedula}: no elegible pero ofrece ${disponibles.map((p) => p.id).join(", ")}`
+    );
+    assert.equal(
+      r.productos.every((p) => p.montoSugerido === 0),
+      true,
+      `${e.cedula}: no elegible con monto sugerido distinto de cero`
+    );
+  }
+});
+
 test("la afinidad es exactamente los puntos cumplidos sobre los posibles", () => {
   const cedulas = generarCedulasEjemplo(300);
   const { results } = procesarLote(cedulas.map((cedula) => ({ cedula })));

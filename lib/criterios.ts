@@ -1,4 +1,11 @@
-import { SMMLV, DTI_ALERTA, MAX_DTI, LIMITES_PRODUCTO, CREDITO_MUJER } from "./constants";
+import {
+  SMMLV,
+  DTI_ALERTA,
+  MAX_DTI,
+  LIMITES_PRODUCTO,
+  CREDITO_MUJER,
+  ANTIGUEDAD_MINIMA,
+} from "./constants";
 import type { Criterio, DatosExogenos, ProductoId } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -47,12 +54,40 @@ function enSMMLV(v: number): string {
   return `${(v / SMMLV).toFixed(1)} SMMLV`;
 }
 
-// Dos condiciones que valen para todo el portafolio: hay que poder pagar la
-// cuota, y el monto tiene que alcanzar el minimo comercial del producto.
+// Lo que vale para TODO el portafolio: los filtros duros de elegibilidad, poder
+// pagar la cuota, y que el monto alcance el minimo comercial del producto.
+//
+// Los filtros duros van aqui y no solo en `decision.ts` porque si no, un perfil
+// no elegible mostraba sus productos como disponibles: "no elegible" arriba y
+// "Credito complementario 92%, $20.000.000" abajo. Modelados como criterios
+// bloqueantes, un rechazo global apaga los 8 productos con su motivo a la vista.
 function criteriosBase(id: ProductoId, e: DatosExogenos, ctx: ContextoDecision): Criterio[] {
   const lim = LIMITES_PRODUCTO[id];
   const monto = id === "compra_cartera" ? e.saldoDeudaExterna : ctx.montoFinanciable;
+  const antiguedadMinima = ANTIGUEDAD_MINIMA[e.tipoContrato] ?? 6;
+
   return [
+    c(
+      10,
+      e.cedulaValida,
+      "Cedula con formato valido",
+      e.cedulaValida ? `${e.cedula}` : `${e.cedula}: no se puede verificar identidad`,
+      true
+    ),
+    c(
+      12,
+      e.antiguedadMeses >= antiguedadMinima,
+      `Antiguedad minima del vinculo (${antiguedadMinima} meses para "${e.tipoContrato}")`,
+      `${e.antiguedadMeses} meses`,
+      true
+    ),
+    c(
+      12,
+      e.moraDias < 60,
+      "Sin mora vigente de 60 dias o mas",
+      e.moraDias === 0 ? "Al dia con el sistema" : `Mora de ${e.moraDias} dias`,
+      true
+    ),
     c(
       18,
       ctx.capacidadCuota > 0,
