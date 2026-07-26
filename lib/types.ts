@@ -79,11 +79,24 @@ export interface DatosExogenos {
   presenciaDigitalNegocio: boolean;
 }
 
-export interface ProductoElegible {
+// Un criterio del perfil objetivo de un producto. La afinidad se calcula
+// sumando los pesos de los que se cumplen, asi que el % y su explicacion nunca
+// pueden desincronizarse.
+export interface Criterio {
+  etiqueta: string; // la regla: "Score de buro >= 600"
+  detalle: string; // el valor real del perfil: "Buro 712"
+  peso: number; // puntos que aporta si se cumple
+  cumple: boolean;
+  bloqueante: boolean; // si no se cumple, el producto no se puede otorgar
+}
+
+export interface ProductoEvaluado {
   id: ProductoId;
   nombre: string;
   montoSugerido: number;
-  encaje: number; // 0 - 100, que tanto encaja el producto con el perfil
+  afinidad: number; // 0 - 100 = puntos cumplidos / puntos posibles
+  aplica: boolean; // false si incumple algun criterio bloqueante
+  criterios: Criterio[];
   modalidad: Modalidad;
   topeAplicado: boolean; // true si el tope por capacidad recorto el monto
 }
@@ -99,7 +112,9 @@ export interface Recomendacion {
   capacidadCuota: number; // cuota mensual adicional que puede asumir
   topeMonto: number; // tope duro por capacidad de pago (regla del brief)
   modalidad: Modalidad;
-  productosElegibles: ProductoElegible[];
+  // Los 8 productos del portafolio, siempre, ordenados por afinidad. Los que no
+  // aplican traen el criterio bloqueante que los descarto.
+  productos: ProductoEvaluado[];
   razones: string[]; // por que se recomienda / como se llego al monto
   alertas: string[]; // banderas de riesgo
 }

@@ -4,21 +4,23 @@ import {
   DTI_ALERTA,
   ANTIGUEDAD_MINIMA,
   LIMITES_PRODUCTO,
-  CREDITO_MUJER,
   TOPE_HASTA_1_SMMLV,
   TOPE_MULTIPLO_SALARIO,
   PRODUCTOS_SIN_TOPE_SALARIAL,
 } from "./constants";
+import { criteriosDe, afinidadDe, PRIORIDAD_PRODUCTO } from "./criterios";
 import { roundMonto } from "./format";
 import type {
   DatosExogenos,
   Recomendacion,
   ProductoId,
-  ProductoElegible,
+  ProductoEvaluado,
   Proposito,
   Modalidad,
   TipoContrato,
 } from "./types";
+
+const TODOS_LOS_PRODUCTOS = Object.keys(LIMITES_PRODUCTO) as ProductoId[];
 
 // Monto financiable con una cuota mensual dada: valor presente de una anualidad.
 //   VP = cuota * (1 - (1 + i)^-n) / i
@@ -135,6 +137,10 @@ export function evaluar(
     score >= 70 ? "Bajo" : score >= 45 ? "Medio" : "Alto";
 
   // --- 4. ASIGNACION DE PRODUCTO --------------------------------------------
+  // Los 8 productos se evaluan siempre, incluso si el perfil no es elegible:
+  // asi el analista ve que faltaria para que cada uno se abriera.
+  const productos = evaluarProductos(e, capacidadCuota, dti);
+
   if (!elegible) {
     return {
       elegible: false,
@@ -147,23 +153,29 @@ export function evaluar(
       capacidadCuota,
       topeMonto,
       modalidad: modalidadBase,
-      productosElegibles: [],
+      productos,
       razones,
       alertas,
     };
   }
 
-  const productosElegibles = evaluarProductos(e, capacidadCuota, dti, sobreendeudado, alertas);
+  if (e.genero === "F" && e.embargos) {
+    alertas.push("Credito Mujer no disponible: reporta embargos.");
+  }
 
-  // Seleccion del producto recomendado: propósito declarado tiene prioridad,
-  // si es "auto" se elige el de mayor encaje.
-  let recomendado: ProductoElegible | undefined;
+  const aplicables = productos.filter((p) => p.aplica);
+
+  // Seleccion del producto recomendado: el proposito declarado tiene prioridad;
+  // en "auto" gana el de mayor afinidad.
+  let recomendado: ProductoEvaluado | undefined;
 
   if (proposito !== "auto") {
     const objetivo = PROPOSITO_A_PRODUCTO[proposito];
-    recomendado = productosElegibles.find((p) => p.id === objetivo);
+    recomendado = aplicables.find((p) => p.id === objetivo);
     if (recomendado) {
-      razones.push(`Producto alineado al proposito declarado ("${LABEL_PROPOSITO[proposito]}").`);
+      razones.push(
+        `Producto alineado al proposito declarado ("${LABEL_PROPOSITO[proposito]}"), afinidad ${recomendado.afinidad}%.`
+      );
     } else {
       razones.push(
         `El proposito "${LABEL_PROPOSITO[proposito]}" no encaja con el perfil; se sugiere la mejor alternativa.`
@@ -171,12 +183,10 @@ export function evaluar(
     }
   }
 
-  if (!recomendado) {
-    recomendado = [...productosElegibles].sort((a, b) => b.encaje - a.encaje)[0];
-  }
+  recomendado ??= aplicables[0];
 
   if (!recomendado) {
-    // Elegible pero ningun producto encaja (caso borde).
+    // Elegible pero ningun producto aplica (caso borde).
     return {
       elegible: true,
       productoRecomendado: null,
@@ -188,11 +198,15 @@ export function evaluar(
       capacidadCuota,
       topeMonto,
       modalidad: modalidadBase,
-      productosElegibles: [],
+      productos,
       razones,
       alertas,
     };
   }
+
+  razones.push(
+    `Afinidad ${recomendado.afinidad}%: cumple ${recomendado.criterios.filter((c) => c.cumple).length} de ${recomendado.criterios.length} criterios del producto.`
+  );
 
   // Razon especifica del producto ganador.
   razones.push(motivoProducto(recomendado.id, e, dti, sobreendeudado));
@@ -213,7 +227,7 @@ export function evaluar(
     capacidadCuota,
     topeMonto,
     modalidad: recomendado.modalidad,
-    productosElegibles: [...productosElegibles].sort((a, b) => b.encaje - a.encaje),
+    productos,
     razones,
     alertas,
   };
@@ -249,129 +263,51 @@ function calcularScore(e: DatosExogenos, dti: number): number {
 }
 
 // --- Evaluacion de cada producto del portafolio -----------------------------
+// Se evaluan SIEMPRE los 8: el analista tiene que poder ver por que se cayo un
+// producto, no solo cual quedo. El que incumple un bloqueante sale con
+// `aplica: false` y el criterio que lo descarto a la vista.
 function evaluarProductos(
   e: DatosExogenos,
   capacidadCuota: number,
-  dti: number,
-  sobreendeudado: boolean,
-  alertas: string[]
-): ProductoElegible[] {
-  const out: ProductoElegible[] = [];
+  dti: number
+): ProductoEvaluado[] {
   const tope = topePorCapacidad(e.ingresoEstimado);
 
-  const push = (id: ProductoId, montoRaw: number, encaje: number) => {
+  return TODOS_LOS_PRODUCTOS.map((id) => {
     const lim = LIMITES_PRODUCTO[id];
+    // El monto de compra de cartera lo fija la deuda que se compra, no la cuota.
+    const montoRaw =
+      id === "compra_cartera" ? e.saldoDeudaExterna : montoPorCuota(capacidadCuota, id);
+
+    const criterios = criteriosDe(id, e, {
+      dti,
+      capacidadCuota,
+      montoFinanciable: montoRaw,
+    });
+    const { afinidad, aplica } = afinidadDe(criterios);
+
     // El tope por capacidad de pago manda sobre el calculo cuota x plazo.
     const conTope = PRODUCTOS_SIN_TOPE_SALARIAL.has(id) ? montoRaw : Math.min(montoRaw, tope);
     const topeAplicado = conTope < montoRaw;
-    const monto = roundMonto(clamp(conTope, lim.min, lim.max));
-    if (monto >= lim.min && encaje > 0) {
-      out.push({
-        id,
-        nombre: lim.nombre,
-        montoSugerido: monto,
-        encaje: Math.round(clamp(encaje, 0, 100)),
-        modalidad: modalidadDe(id, e.tipoContrato),
-        topeAplicado,
-      });
-    }
-  };
 
-  const capOK = capacidadCuota > 0;
+    return {
+      id,
+      nombre: lim.nombre,
+      montoSugerido: aplica ? roundMonto(clamp(conTope, lim.min, lim.max)) : 0,
+      afinidad,
+      aplica,
+      criterios,
+      modalidad: modalidadDe(id, e.tipoContrato),
+      topeAplicado: aplica && topeAplicado,
+    };
+  }).sort(porAfinidad);
+}
 
-  // Compra de cartera: razon de ser = deudas con otras entidades.
-  // Solo debe DOMINAR cuando hay sobreendeudamiento real; si el DTI es bajo,
-  // queda como alternativa por debajo de un cupo/credito nuevo.
-  if (e.entidadesConDeuda >= 2 && e.saldoDeudaExterna >= LIMITES_PRODUCTO.compra_cartera.min) {
-    let encaje = 28 + e.entidadesConDeuda * 6 + (sobreendeudado ? 35 : 0);
-    if (e.moraDias > 0) encaje -= 10;
-    push("compra_cartera", e.saldoDeudaExterna, encaje);
-  }
-
-  // Cupo rotativo / consumo: base para casi todos con capacidad. Es la opcion
-  // por defecto, asi que su encaje es deliberadamente moderado: cualquier
-  // producto con una senal propia fuerte debe poder ganarle.
-  if (capOK) {
-    let encaje = 46 - dti * 40;
-    if (e.categoriaAfiliacion === "A" || e.categoriaAfiliacion === "B") encaje += 8;
-    push("cupo_rotativo", montoPorCuota(capacidadCuota, "cupo_rotativo"), encaje);
-  }
-
-  // Libre inversion: hasta 150M, incluso sin historial. Ideal independientes/cat C.
-  if (capOK && e.moraDias === 0) {
-    let encaje = 40 + (e.scoreBuro > 650 ? 15 : 0);
-    if (e.categoriaAfiliacion === "C") encaje += 15;
-    if (e.tipoContrato === "Independiente" && e.tieneNegocio) encaje += 15;
-    if (e.entidadesConDeuda === 0) encaje += 10; // sin historial tradicional -> Colsubsidio lo permite
-    push("libre_inversion", montoPorCuota(capacidadCuota, "libre_inversion"), encaje);
-  }
-
-  // Hipotecario: ticket alto, requiere capacidad e ingreso solidos. Los filtros
-  // de entrada ya son la senal fuerte, por eso arranca alto cuando se cumplen.
-  if (capacidadCuota >= 800_000 && (e.categoriaAfiliacion === "B" || e.categoriaAfiliacion === "C") && e.scoreBuro >= 600 && !e.embargos) {
-    const encaje =
-      48 +
-      (e.categoriaAfiliacion === "C" ? 15 : 0) +
-      (e.edad < 50 ? 10 : 0) +
-      (e.antiguedadMeses >= 36 ? 8 : 0);
-    push("hipotecario", montoPorCuota(capacidadCuota, "hipotecario"), encaje);
-  }
-
-  // Educativo: la senal es la edad formativa. Para un joven debe ganarle al cupo.
-  if (capOK) {
-    const encaje =
-      34 +
-      (e.edad <= 30 ? 32 : e.edad <= 35 ? 18 : 0) +
-      (e.categoriaAfiliacion === "A" || e.categoriaAfiliacion === "B" ? 6 : 0);
-    push("educativo", montoPorCuota(capacidadCuota, "educativo"), encaje);
-  }
-
-  // Credito Mujer: requisitos verificables.
-  if (
-    e.genero === "F" &&
-    e.edad >= CREDITO_MUJER.edadMin &&
-    e.edad <= CREDITO_MUJER.edadMax &&
-    e.ingresoEstimado > SMMLV * CREDITO_MUJER.ingresoMinSMMLV &&
-    e.afiliado &&
-    !e.embargos &&
-    capOK
-  ) {
-    // Producto objetivo con beneficios diferenciales: si la afiliada califica,
-    // el motor lo prioriza sobre un cupo generico.
-    let encaje = 61 - dti * 20 + (e.tipoContrato === "Independiente" ? 6 : 0);
-    push("credito_mujer", montoPorCuota(capacidadCuota, "credito_mujer"), encaje);
-  } else if (e.genero === "F" && e.embargos) {
-    alertas.push("Credito Mujer no disponible: reporta embargos.");
-  }
-
-  // Credito complementario: linea adicional para el afiliado que ya se mueve en
-  // el mercado con una sola obligacion sana. Senal: afiliado, 1-2 entidades,
-  // DTI holgado y sin mora.
-  if (
-    capOK &&
-    e.afiliado &&
-    e.moraDias === 0 &&
-    e.entidadesConDeuda >= 1 &&
-    e.entidadesConDeuda <= 2 &&
-    dti < DTI_ALERTA
-  ) {
-    const encaje =
-      44 + (e.antiguedadMeses >= 24 ? 10 : 0) + (e.scoreBuro >= 650 ? 8 : 0);
-    push("complementario", montoPorCuota(capacidadCuota, "complementario"), encaje);
-  }
-
-  // Rotativo seguros e impuestos: la senal es tener que pagar predial, vehiculo
-  // o polizas. Sin esa senal queda como alternativa de bajo encaje, para que el
-  // proposito declarado lo siga alcanzando.
-  if (capOK && e.categoriaAfiliacion !== "D") {
-    const tienePatrimonio = e.categoriaAfiliacion === "C" || e.tieneNegocio;
-    const encaje = tienePatrimonio
-      ? 40 + (e.categoriaAfiliacion === "C" ? 18 : 0) + (e.tieneNegocio ? 10 : 0)
-      : 18;
-    push("rotativo_seguros_impuestos", montoPorCuota(capacidadCuota, "rotativo_seguros_impuestos"), encaje);
-  }
-
-  return out;
+// Ordena por afinidad; a igual afinidad gana el producto mas especifico.
+function porAfinidad(a: ProductoEvaluado, b: ProductoEvaluado): number {
+  if (a.aplica !== b.aplica) return a.aplica ? -1 : 1;
+  if (b.afinidad !== a.afinidad) return b.afinidad - a.afinidad;
+  return PRIORIDAD_PRODUCTO.indexOf(a.id) - PRIORIDAD_PRODUCTO.indexOf(b.id);
 }
 
 // --- Mapeos y textos --------------------------------------------------------

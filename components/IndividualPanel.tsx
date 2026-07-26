@@ -336,17 +336,17 @@ function Resultado({ data }: { data: PerfilCompleto }) {
           </>
         )}
 
-        {r.productosElegibles.length > 1 && (
+        {r.productos.length > 1 && (
           <>
             <div className="section-label">Otros productos elegibles</div>
             <div className="chips">
-              {r.productosElegibles
-                .filter((p) => p.id !== r.productoRecomendado)
+              {r.productos
+                .filter((p) => p.aplica && p.id !== r.productoRecomendado)
                 .map((p) => (
                   <span className="chip" key={p.id}>
                     {p.nombre} <b>{formatCOP(p.montoSugerido)}</b>
                     <span className="enc">
-                      {p.modalidad} · encaje {p.encaje}
+                      {p.modalidad} · afinidad {p.afinidad}%
                     </span>
                   </span>
                 ))}

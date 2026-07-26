@@ -6,6 +6,7 @@ import { topePorCapacidad, modalidadDe, evaluar, montoPorCuota } from "./decisio
 import { generarExogenos, generarCedulasEjemplo, normalizarCategoria } from "./synthetic";
 import { parsearInsumo } from "./insumo";
 import { procesarLote } from "./engine";
+import { LOTE_DEMO, loteDemoComoCsv } from "./demo";
 import type { ProductoId } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,86 @@ test("modo auto alcanza todo el portafolio en un lote de 2.000", () => {
     (id) => !ganadores.has(id)
   );
   assert.deepEqual(faltantes, [], `productos que nunca ganan en auto: ${faltantes.join(", ")}`);
+});
+
+// ---------------------------------------------------------------------------
+// Afinidad por criterios ponderados.
+// ---------------------------------------------------------------------------
+
+test("se evaluan los 8 productos incluso cuando el perfil no es elegible", () => {
+  const base = generarExogenos("1024587963");
+  const noElegible = evaluar({ ...base, moraDias: 90, cedulaValida: true });
+  assert.equal(noElegible.elegible, false);
+  assert.equal(noElegible.productos.length, 8);
+  assert.deepEqual(
+    noElegible.productos.map((p) => p.id).sort(),
+    (Object.keys(LIMITES_PRODUCTO) as ProductoId[]).sort()
+  );
+});
+
+test("la afinidad es exactamente los puntos cumplidos sobre los posibles", () => {
+  const cedulas = generarCedulasEjemplo(300);
+  const { results } = procesarLote(cedulas.map((cedula) => ({ cedula })));
+  for (const { recomendacion } of results) {
+    for (const p of recomendacion.productos) {
+      const posibles = p.criterios.reduce((a, c) => a + c.peso, 0);
+      const cumplidos = p.criterios.reduce((a, c) => a + (c.cumple ? c.peso : 0), 0);
+      assert.equal(
+        p.afinidad,
+        Math.round((cumplidos / posibles) * 100),
+        `${p.id}: afinidad ${p.afinidad}% no cuadra con ${cumplidos}/${posibles}`
+      );
+    }
+  }
+});
+
+test("un bloqueante incumplido deja el producto en 'no aplica' y fuera de la recomendacion", () => {
+  const cedulas = generarCedulasEjemplo(300);
+  const { results } = procesarLote(cedulas.map((cedula) => ({ cedula })));
+  for (const { recomendacion: r } of results) {
+    for (const p of r.productos) {
+      const bloqueado = p.criterios.some((c) => c.bloqueante && !c.cumple);
+      assert.equal(p.aplica, !bloqueado, `${p.id}: aplica=${p.aplica} con bloqueado=${bloqueado}`);
+      // Un producto que no aplica nunca puede llevar monto ni ser el recomendado.
+      if (!p.aplica) {
+        assert.equal(p.montoSugerido, 0, `${p.id}: monto en producto que no aplica`);
+        assert.notEqual(r.productoRecomendado, p.id, `${p.id}: recomendado pese a no aplicar`);
+      }
+    }
+  }
+});
+
+test("el producto recomendado es el de mayor afinidad entre los que aplican", () => {
+  const cedulas = generarCedulasEjemplo(300);
+  const { results } = procesarLote(cedulas.map((cedula) => ({ cedula })));
+  for (const { recomendacion: r } of results) {
+    if (!r.elegible || !r.productoRecomendado) continue;
+    const mejor = r.productos.filter((p) => p.aplica)[0];
+    assert.equal(r.productoRecomendado, mejor.id);
+    assert.equal(r.montoSugerido, mejor.montoSugerido);
+  }
+});
+
+test("todo criterio trae la regla y el valor real del perfil que la sustenta", () => {
+  const r = evaluar(generarExogenos("1022383083"));
+  for (const p of r.productos) {
+    assert.ok(p.criterios.length > 0, `${p.id}: sin criterios`);
+    for (const c of p.criterios) {
+      assert.ok(c.etiqueta.length > 0 && c.detalle.length > 0, `${p.id}: criterio sin texto`);
+      assert.ok(c.peso > 0, `${p.id}: criterio con peso ${c.peso}`);
+    }
+  }
+});
+
+test("el proposito declarado solo alcanza productos que aplican", () => {
+  const cedulas = generarCedulasEjemplo(200);
+  // Vivienda es el propósito mas exigente: casi nadie califica.
+  const { results } = procesarLote(cedulas.map((cedula) => ({ cedula })), "vivienda");
+  for (const { recomendacion: r } of results) {
+    if (r.productoRecomendado !== "hipotecario") continue;
+    const hip = r.productos.find((p) => p.id === "hipotecario")!;
+    assert.equal(hip.aplica, true, "se recomendo hipotecario sin cumplir sus bloqueantes");
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -261,6 +342,46 @@ test("el resumen del lote cuadra con los resultados", () => {
   assert.equal(sumaProducto, 200);
   const sumaModalidad = Object.values(resumen.distribucionModalidad).reduce((a, b) => a + b, 0);
   assert.equal(sumaModalidad, resumen.elegibles);
+});
+
+// ---------------------------------------------------------------------------
+// Lote de demostracion: existe para contar una historia completa. Si calibrar
+// los pesos lo deja cojo, este test avisa antes de la demo, no durante.
+// ---------------------------------------------------------------------------
+
+test("el lote demo cubre todo el portafolio, los dos topes y los rechazos", () => {
+  const { results, resumen } = procesarLote(LOTE_DEMO);
+
+  const ganadores = new Set(results.map((r) => r.recomendacion.productoRecomendado).filter(Boolean));
+  const faltantes = (Object.keys(LIMITES_PRODUCTO) as ProductoId[]).filter((id) => !ganadores.has(id));
+  assert.deepEqual(faltantes, [], `el lote demo no muestra: ${faltantes.join(", ")}`);
+
+  // Los dos topes de monto del brief.
+  assert.ok(
+    results.some((r) => r.exogenos.ingresoEstimado <= SMMLV && r.recomendacion.montoSugerido === TOPE_HASTA_1_SMMLV),
+    "falta un caso que aterrice en el tope de $1.500.000"
+  );
+  assert.ok(
+    results.some((r) => r.recomendacion.productos.some((p) => p.aplica && p.topeAplicado)),
+    "falta un caso donde el tope por capacidad recorte el monto"
+  );
+
+  // Los tres motivos de rechazo y el prospecto no afiliado.
+  assert.ok(resumen.noElegibles >= 3, "el lote demo deberia traer varios no elegibles");
+  assert.ok(results.some((r) => r.exogenos.moraDias >= 60), "falta un rechazo por mora");
+  assert.ok(results.some((r) => r.exogenos.embargos), "falta un caso con embargos");
+  assert.ok(results.some((r) => r.exogenos.categoriaAfiliacion === "D"), "falta un no afiliado");
+
+  // Y registros que llegan con datos propios del usuario.
+  assert.ok(resumen.camposDeInsumo >= 8, `solo ${resumen.camposDeInsumo} registros traen insumo`);
+});
+
+test("el CSV del lote demo se vuelve a leer sin perder los campos del insumo", () => {
+  const { registros } = parsearInsumo(loteDemoComoCsv());
+  assert.equal(registros.length, LOTE_DEMO.length);
+  assert.deepEqual(registros.map((r) => r.cedula), LOTE_DEMO.map((r) => r.cedula));
+  const conNombre = LOTE_DEMO.filter((r) => r.nombre).length;
+  assert.equal(registros.filter((r) => r.nombre).length, conNombre);
 });
 
 test("el resumen cuenta los registros que traian datos del usuario", () => {
