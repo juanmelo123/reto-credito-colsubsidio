@@ -11,7 +11,10 @@ export default function Home() {
     <>
       <header className="appbar">
         <div className="appbar-inner">
-          <div className="logo" aria-hidden />
+          <div className="logo" aria-hidden>
+            <i />
+            <i />
+          </div>
           <div>
             <h1>Motor de Enriquecimiento Crediticio</h1>
             <p className="sub">Reto Credito · Hackathon Colsubsidio x 30X</p>

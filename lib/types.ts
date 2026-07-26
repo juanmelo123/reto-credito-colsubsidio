@@ -18,6 +18,7 @@ export type ProductoId =
   | "educativo"
   | "compra_cartera"
   | "credito_mujer"
+  | "complementario"
   | "rotativo_seguros_impuestos";
 
 export type Proposito =
@@ -27,7 +28,23 @@ export type Proposito =
   | "educacion"
   | "libre"
   | "unificar"
+  | "complementario"
   | "seguros_impuestos";
+
+// Modalidad de desembolso/recaudo (regla de perfilamiento del brief).
+export type Modalidad = "Libranza" | "No libranza" | "Cupo";
+
+// Campos que el brief define como insumo que sube el usuario. Si vienen en el
+// archivo NO se sintetizan: se respetan y se marcan como origen "insumo".
+export type CampoInsumo = "nombre" | "correo" | "direccion" | "categoriaAfiliacion";
+
+export interface RegistroEntrada {
+  cedula: string;
+  nombre?: string;
+  correo?: string;
+  direccion?: string;
+  categoriaAfiliacion?: CategoriaAfiliacion;
+}
 
 // Variables exogenas sinteticas: lo que un buro / scraper devolveria a partir de la cedula.
 export interface DatosExogenos {
@@ -38,9 +55,12 @@ export interface DatosExogenos {
   genero: Genero;
   edad: number;
   ciudad: string;
+  direccion: string;
   correo: string;
   instagram: string | null;
   linkedin: boolean;
+  // Trazabilidad: que campos vinieron del archivo del usuario y cuales se enriquecieron.
+  camposDeInsumo: CampoInsumo[];
   // Laboral / ingreso
   tipoContrato: TipoContrato;
   antiguedadMeses: number;
@@ -64,6 +84,8 @@ export interface ProductoElegible {
   nombre: string;
   montoSugerido: number;
   encaje: number; // 0 - 100, que tanto encaja el producto con el perfil
+  modalidad: Modalidad;
+  topeAplicado: boolean; // true si el tope por capacidad recorto el monto
 }
 
 export interface Recomendacion {
@@ -75,6 +97,8 @@ export interface Recomendacion {
   nivelRiesgo: "Bajo" | "Medio" | "Alto";
   dti: number; // 0 - 1
   capacidadCuota: number; // cuota mensual adicional que puede asumir
+  topeMonto: number; // tope duro por capacidad de pago (regla del brief)
+  modalidad: Modalidad;
   productosElegibles: ProductoElegible[];
   razones: string[]; // por que se recomienda / como se llego al monto
   alertas: string[]; // banderas de riesgo
@@ -86,19 +110,25 @@ export interface PerfilCompleto {
 }
 
 export interface EnrichRequest {
-  cedulas: string[];
+  // Forma nueva: respeta los campos del insumo del usuario.
+  registros?: RegistroEntrada[];
+  // Forma corta (compatibilidad): solo cedulas, todo lo demas se enriquece.
+  cedulas?: string[];
   proposito?: Proposito;
 }
 
 export interface EnrichResponse {
+  proveedor: string; // que fuente de datos exogenos genero los perfiles
   results: PerfilCompleto[];
   resumen: {
     total: number;
     elegibles: number;
     noElegibles: number;
     ingresoPromedio: number;
+    camposDeInsumo: number; // registros que traian datos propios del usuario
     distribucionProducto: Record<string, number>;
     distribucionCategoria: Record<string, number>;
     distribucionRiesgo: Record<string, number>;
+    distribucionModalidad: Record<string, number>;
   };
 }

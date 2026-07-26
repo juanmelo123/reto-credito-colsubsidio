@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { PerfilCompleto, Proposito } from "@/lib/types";
+import type { PerfilCompleto, Proposito, CampoInsumo } from "@/lib/types";
 import { formatCOP, formatPercent } from "@/lib/format";
 import { RiskBadge, CatBadge, ScoreGauge } from "./shared";
 
@@ -12,12 +12,19 @@ const PROPOSITOS: { value: Proposito; label: string }[] = [
   { value: "vivienda", label: "Vivienda" },
   { value: "educacion", label: "Educacion" },
   { value: "unificar", label: "Unificar deudas" },
+  { value: "complementario", label: "Credito complementario" },
   { value: "seguros_impuestos", label: "Seguros e impuestos" },
 ];
 
 export default function IndividualPanel() {
   const [cedula, setCedula] = useState("");
   const [proposito, setProposito] = useState<Proposito>("auto");
+  // Campos del insumo del brief: opcionales. Lo que se llene NO se sintetiza.
+  const [nombre, setNombre] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [verInsumo, setVerInsumo] = useState(false);
   const [data, setData] = useState<PerfilCompleto | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +41,18 @@ export default function IndividualPanel() {
       const res = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cedulas: [c], proposito }),
+        body: JSON.stringify({
+          registros: [
+            {
+              cedula: c,
+              nombre: nombre.trim() || undefined,
+              correo: correo.trim() || undefined,
+              direccion: direccion.trim() || undefined,
+              categoriaAfiliacion: categoria || undefined,
+            },
+          ],
+          proposito,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error en la consulta");
@@ -63,7 +81,7 @@ export default function IndividualPanel() {
               id="ced"
               type="text"
               inputMode="numeric"
-              placeholder="Ej: 1024587963"
+              placeholder="Ej: 1028404676"
               value={cedula}
               onChange={(e) => setCedula(e.target.value)}
               onKeyDown={onKey}
@@ -90,11 +108,71 @@ export default function IndividualPanel() {
             {loading ? "Consultando..." : "Enriquecer y perfilar"}
           </button>
         </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          style={{ marginTop: 12 }}
+          onClick={() => setVerInsumo((v) => !v)}
+          aria-expanded={verInsumo}
+        >
+          {verInsumo ? "Ocultar" : "Agregar"} datos que ya tengo (opcional)
+        </button>
+
+        {verInsumo && (
+          <div className="row" style={{ marginTop: 12 }}>
+            <div style={{ flex: "1 1 200px" }}>
+              <label className="field-label" htmlFor="in-nombre">
+                Nombre
+              </label>
+              <input
+                id="in-nombre"
+                value={nombre}
+                onChange={(ev) => setNombre(ev.target.value)}
+                placeholder="Se enriquece si lo dejas vacio"
+              />
+            </div>
+            <div style={{ flex: "1 1 200px" }}>
+              <label className="field-label" htmlFor="in-correo">
+                Correo
+              </label>
+              <input
+                id="in-correo"
+                value={correo}
+                onChange={(ev) => setCorreo(ev.target.value)}
+                placeholder="Se enriquece si lo dejas vacio"
+              />
+            </div>
+            <div style={{ flex: "1 1 200px" }}>
+              <label className="field-label" htmlFor="in-dir">
+                Direccion
+              </label>
+              <input
+                id="in-dir"
+                value={direccion}
+                onChange={(ev) => setDireccion(ev.target.value)}
+                placeholder="Se enriquece si lo dejas vacio"
+              />
+            </div>
+            <div style={{ flex: "0 1 160px" }}>
+              <label className="field-label" htmlFor="in-cat">
+                Categoria afiliacion
+              </label>
+              <select id="in-cat" value={categoria} onChange={(ev) => setCategoria(ev.target.value)}>
+                <option value="">Inferir del ingreso</option>
+                <option value="A">A (hasta 2 SMMLV)</option>
+                <option value="B">B (2 a 4 SMMLV)</option>
+                <option value="C">C (mas de 4 SMMLV)</option>
+                <option value="D">D (no afiliado)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         <p className="hint">
           Datos sinteticos y deterministas: la misma cedula devuelve siempre el mismo perfil.
-          Casos de ejemplo — <code>538470559</code> (compra de cartera),{" "}
-          <code>128813890</code> (libre inversion sin historial) y <code>452792170</code>{" "}
-          (credito mujer).
+          Casos de ejemplo — <code>1028404676</code> (compra de cartera, 4 entidades),{" "}
+          <code>1051570194</code> (ingreso bajo 1 SMMLV: tope de $1.500.000),{" "}
+          <code>1022383083</code> (hipotecario, categoria C) y <code>28247876</code> (credito
+          mujer, pensionada).
         </p>
         {error && <div className="error-box">{error}</div>}
       </div>
@@ -106,19 +184,27 @@ export default function IndividualPanel() {
 
 function Resultado({ data }: { data: PerfilCompleto }) {
   const { exogenos: e, recomendacion: r } = data;
+  const delInsumo = (campo: CampoInsumo) => e.camposDeInsumo.includes(campo);
   return (
     <div className="result-grid">
       {/* --- Perfil enriquecido --- */}
       <div className="card card-pad">
         <p className="card-title">Perfil enriquecido · variables exogenas</p>
+        {e.camposDeInsumo.length > 0 && (
+          <p className="hint" style={{ marginTop: 0 }}>
+            {e.camposDeInsumo.length} campo(s) vienen de tu insumo y se respetaron tal cual; el
+            resto lo aporta el motor.
+          </p>
+        )}
 
         <div className="section-label">Identidad y contacto</div>
         <div className="data-list">
-          <Row k="Nombre" v={e.nombre} />
-          <Row k="Cedula" v={`${e.cedula}${e.cedulaValida ? "" : " (formato invalido)"}`} />
+          <Row k="Nombre" v={e.nombre} insumo={delInsumo("nombre")} />
+          <Row k="Cedula" v={`${e.cedula}${e.cedulaValida ? "" : " (formato invalido)"}`} insumo />
           <Row k="Edad / Genero" v={`${e.edad} anios · ${e.genero === "F" ? "Femenino" : "Masculino"}`} />
           <Row k="Ciudad" v={e.ciudad} />
-          <Row k="Correo" v={e.correo} />
+          <Row k="Direccion" v={e.direccion} insumo={delInsumo("direccion")} />
+          <Row k="Correo" v={e.correo} insumo={delInsumo("correo")} />
           <Row k="Instagram" v={e.instagram ?? "No detectado"} />
           <Row k="LinkedIn" v={e.linkedin ? "Perfil detectado" : "No detectado"} />
         </div>
@@ -131,6 +217,7 @@ function Resultado({ data }: { data: PerfilCompleto }) {
           <Row
             k="Categoria afiliacion"
             v={e.afiliado ? `Categoria ${e.categoriaAfiliacion}` : "No afiliado (D)"}
+            insumo={delInsumo("categoriaAfiliacion")}
           />
           {e.tipoContrato === "Independiente" && (
             <Row
@@ -170,7 +257,7 @@ function Resultado({ data }: { data: PerfilCompleto }) {
                 </div>
                 <div className="reco-product">{r.nombreProducto}</div>
                 <div className="reco-amount">
-                  Monto sugerido: <b>{formatCOP(r.montoSugerido)}</b>
+                  Monto sugerido: <b>{formatCOP(r.montoSugerido)}</b> · {r.modalidad}
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>
@@ -196,6 +283,12 @@ function Resultado({ data }: { data: PerfilCompleto }) {
                   {formatCOP(r.capacidadCuota)}
                 </div>
                 <div className="ml">Cuota adicional/mes</div>
+              </div>
+              <div className="metric">
+                <div className="mv num" style={{ fontSize: 16 }}>
+                  {formatCOP(r.topeMonto)}
+                </div>
+                <div className="ml">Tope por capacidad</div>
               </div>
               <div className="metric">
                 <div className="mv num">{e.scoreBuro}</div>
@@ -252,7 +345,9 @@ function Resultado({ data }: { data: PerfilCompleto }) {
                 .map((p) => (
                   <span className="chip" key={p.id}>
                     {p.nombre} <b>{formatCOP(p.montoSugerido)}</b>
-                    <span className="enc">encaje {p.encaje}</span>
+                    <span className="enc">
+                      {p.modalidad} · encaje {p.encaje}
+                    </span>
                   </span>
                 ))}
             </div>
@@ -263,11 +358,24 @@ function Resultado({ data }: { data: PerfilCompleto }) {
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+// `insumo` solo se pasa en los 5 campos que el brief define como entrada del
+// usuario: ahi el badge distingue si el dato vino del archivo o lo puso el
+// motor. En el resto de variables (siempre exogenas) el badge seria ruido.
+function Row({ k, v, insumo }: { k: string; v: string; insumo?: boolean }) {
   return (
     <div className="data-row">
       <span className="k">{k}</span>
-      <span className="v">{v}</span>
+      <span className="v">
+        {v}
+        {insumo !== undefined && (
+          <span
+            className={`origen ${insumo ? "origen-insumo" : ""}`}
+            title={insumo ? "Dato que trajiste en tu insumo" : "Variable exogena aportada por el motor"}
+          >
+            {insumo ? "insumo" : "enriquecido"}
+          </span>
+        )}
+      </span>
     </div>
   );
 }

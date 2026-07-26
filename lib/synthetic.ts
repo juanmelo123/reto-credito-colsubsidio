@@ -5,6 +5,8 @@ import type {
   Genero,
   CategoriaAfiliacion,
   TipoContrato,
+  RegistroEntrada,
+  CampoInsumo,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -53,6 +55,8 @@ const CIUDADES = [
 
 const DOMINIOS = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com"];
 
+const VIAS = ["Calle", "Carrera", "Diagonal", "Transversal", "Avenida Calle"];
+
 // Quita tildes/enes para armar correos y usuarios "scrapeables".
 function slug(s: string): string {
   return s
@@ -85,6 +89,11 @@ function generarNombre(rng: Rng, genero: Genero): string {
   return `${primer}${segundo} ${ap1} ${ap2}`;
 }
 
+function generarDireccion(rng: Rng, ciudad: string): string {
+  const via = rng.pick(VIAS);
+  return `${via} ${rng.int(1, 180)} # ${rng.int(1, 120)} - ${rng.int(1, 99)}, ${ciudad}`;
+}
+
 function generarCorreo(rng: Rng, nombre: string, cedula: string): string {
   const partes = nombre.split(" ").map(slug).filter(Boolean);
   const nick = partes[0];
@@ -106,29 +115,62 @@ export function validarCedula(raw: string): { valida: boolean; normalizada: stri
   return { valida, normalizada };
 }
 
-export function generarExogenos(cedulaRaw: string): DatosExogenos {
+// `insumo` son los campos que el usuario ya trae en su archivo (cedula, nombre,
+// correo, direccion, categoria). Lo que venga ahi NO se sintetiza: se respeta y
+// se registra en `camposDeInsumo`. Lo que falte, se enriquece.
+export function generarExogenos(
+  cedulaRaw: string,
+  insumo?: RegistroEntrada
+): DatosExogenos {
   const { valida, normalizada } = validarCedula(cedulaRaw);
   const cedula = normalizada || cedulaRaw.trim();
 
   const rng = makeRng(`col-cred::${cedula}`);
+  const camposDeInsumo: CampoInsumo[] = [];
+  // Toma el dato del insumo si viene no vacio; si no, deja el sintetico.
+  const delInsumo = (campo: CampoInsumo, valor: string | undefined, fallback: string): string => {
+    const limpio = valor?.trim();
+    if (!limpio) return fallback;
+    camposDeInsumo.push(campo);
+    return limpio;
+  };
 
   const genero: Genero = rng.bool(0.51) ? "F" : "M";
   const edad = clamp(Math.round(rng.normal(38, 13)), 18, 78);
-  const nombre = generarNombre(rng, genero);
-  const ciudad = rng.weighted(CIUDADES.map((c) => ({ value: c.nombre, weight: c.peso })));
-  const correo = generarCorreo(rng, nombre, cedula);
+  // Los draws del PRNG se consumen siempre en el mismo orden, traiga o no
+  // insumo el usuario: asi el resto del perfil no cambia al subir un archivo.
+  const nombre = delInsumo("nombre", insumo?.nombre, generarNombre(rng, genero));
+  const ciudadSintetica = rng.weighted(CIUDADES.map((c) => ({ value: c.nombre, weight: c.peso })));
+  const direccion = delInsumo("direccion", insumo?.direccion, generarDireccion(rng, ciudadSintetica));
+  // Si la direccion la trajo el usuario y nombra una ciudad conocida, esa manda:
+  // dejar "Manizales" junto a una direccion de Bogota seria incoherente.
+  const ciudad = ciudadEnTexto(insumo?.direccion) ?? ciudadSintetica;
+  const correo = delInsumo("correo", insumo?.correo, generarCorreo(rng, nombre, cedula));
   const instagram = rng.bool(0.62) ? `@${slug(nombre.split(" ")[0])}${rng.int(1, 999)}` : null;
   const linkedin = rng.bool(0.34);
 
   // Ingreso estimado: distribucion log-normal sesgada a la derecha (mediana ~1.6 SMMLV).
   const factorIngreso = clamp(rng.lognormal(0.45, 0.62), 0.55, 30);
-  const ingresoEstimado = Math.round((SMMLV * factorIngreso) / 10_000) * 10_000;
+  let ingresoEstimado = Math.round((SMMLV * factorIngreso) / 10_000) * 10_000;
 
   // Afiliacion: ~12% son prospectos NO afiliados (categoria D).
-  const afiliado = !rng.bool(0.12);
-  const categoriaAfiliacion: CategoriaAfiliacion = afiliado
-    ? categoriaPorIngreso(ingresoEstimado)
-    : "D";
+  const afiliadoSintetico = !rng.bool(0.12);
+  const catInsumo = normalizarCategoria(insumo?.categoriaAfiliacion);
+  let categoriaAfiliacion: CategoriaAfiliacion;
+  let afiliado: boolean;
+
+  if (catInsumo) {
+    // La categoria la reporta el empleador y manda sobre el ingreso estimado:
+    // si el insumo dice "A", el ingreso se ajusta a la banda de A para no
+    // producir perfiles incoherentes (categoria A con ingreso de 8 SMMLV).
+    camposDeInsumo.push("categoriaAfiliacion");
+    categoriaAfiliacion = catInsumo;
+    afiliado = catInsumo !== "D";
+    ingresoEstimado = ajustarIngresoABanda(ingresoEstimado, catInsumo);
+  } else {
+    afiliado = afiliadoSintetico;
+    categoriaAfiliacion = afiliado ? categoriaPorIngreso(ingresoEstimado) : "D";
+  }
 
   // Vinculo laboral (pensionados mas frecuentes en edades altas).
   const tipoContrato: TipoContrato = rng.weighted<TipoContrato>([
@@ -186,9 +228,11 @@ export function generarExogenos(cedulaRaw: string): DatosExogenos {
     genero,
     edad,
     ciudad,
+    direccion,
     correo,
     instagram,
     linkedin,
+    camposDeInsumo,
     tipoContrato,
     antiguedadMeses,
     ingresoEstimado,
@@ -203,6 +247,35 @@ export function generarExogenos(cedulaRaw: string): DatosExogenos {
     tieneNegocio,
     presenciaDigitalNegocio,
   };
+}
+
+// Busca una ciudad conocida dentro de una direccion escrita por el usuario.
+function ciudadEnTexto(texto: string | undefined): string | null {
+  if (!texto) return null;
+  const plano = slug(texto);
+  return CIUDADES.find((c) => plano.includes(slug(c.nombre)))?.nombre ?? null;
+}
+
+// Acepta "A", "a", "Categoria B", "cat c"... y descarta cualquier otra cosa.
+export function normalizarCategoria(raw: string | undefined): CategoriaAfiliacion | null {
+  if (!raw) return null;
+  const m = raw.trim().toUpperCase().match(/\b([ABCD])\b/);
+  return m ? (m[1] as CategoriaAfiliacion) : null;
+}
+
+// Encaja el ingreso dentro de la banda salarial que implica la categoria.
+function ajustarIngresoABanda(ingreso: number, cat: CategoriaAfiliacion): number {
+  // D (no afiliado) no tiene banda reportada por empleador: se deja el estimado.
+  if (cat === "D") return ingreso;
+
+  const min = cat === "B" ? SMMLV * CATEGORIA_UMBRALES.A : cat === "C" ? SMMLV * CATEGORIA_UMBRALES.B : SMMLV;
+  const max = cat === "A" ? SMMLV * CATEGORIA_UMBRALES.A : cat === "B" ? SMMLV * CATEGORIA_UMBRALES.B : Infinity;
+  // Los limites se redondean hacia adentro de la banda: si se redondeara el
+  // valor a secas, un ingreso pegado al piso caeria en la categoria de abajo.
+  const minRedondeado = Math.ceil(min / 10_000) * 10_000;
+  const maxRedondeado = max === Infinity ? Infinity : Math.floor(max / 10_000) * 10_000;
+  const redondeado = Math.round(clamp(ingreso, min, max) / 10_000) * 10_000;
+  return clamp(redondeado, minRedondeado, maxRedondeado);
 }
 
 function generarAntiguedad(rng: Rng, contrato: TipoContrato, edad: number): number {

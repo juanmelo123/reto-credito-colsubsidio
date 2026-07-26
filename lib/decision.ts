@@ -5,6 +5,9 @@ import {
   ANTIGUEDAD_MINIMA,
   LIMITES_PRODUCTO,
   CREDITO_MUJER,
+  TOPE_HASTA_1_SMMLV,
+  TOPE_MULTIPLO_SALARIO,
+  PRODUCTOS_SIN_TOPE_SALARIAL,
 } from "./constants";
 import { roundMonto } from "./format";
 import type {
@@ -13,7 +16,45 @@ import type {
   ProductoId,
   ProductoElegible,
   Proposito,
+  Modalidad,
+  TipoContrato,
 } from "./types";
+
+// Monto financiable con una cuota mensual dada: valor presente de una anualidad.
+//   VP = cuota * (1 - (1 + i)^-n) / i
+// Sin descontar la tasa, `cuota x plazo` sobreestima el monto varias veces en
+// los plazos largos (a 180 meses, casi el triple).
+export function montoPorCuota(cuotaMensual: number, producto: ProductoId): number {
+  const { plazoMeses, tasaMensual } = LIMITES_PRODUCTO[producto];
+  if (cuotaMensual <= 0) return 0;
+  if (tasaMensual <= 0) return cuotaMensual * plazoMeses;
+  return (cuotaMensual * (1 - Math.pow(1 + tasaMensual, -plazoMeses))) / tasaMensual;
+}
+
+// Tope duro de monto por capacidad de pago (regla textual del brief):
+//   hasta 1 SMMLV -> $1.500.000 por libranza;  por encima -> 3 veces el salario.
+export function topePorCapacidad(ingresoMensual: number): number {
+  if (ingresoMensual <= SMMLV) return TOPE_HASTA_1_SMMLV;
+  return ingresoMensual * TOPE_MULTIPLO_SALARIO;
+}
+
+// La libranza exige pagaduria (descuento de nomina o de mesada pensional).
+const CONTRATOS_CON_PAGADURIA: ReadonlySet<TipoContrato> = new Set<TipoContrato>([
+  "Indefinido",
+  "Termino fijo",
+  "Pensionado",
+]);
+
+// Los rotativos se recaudan como cupo, no por libranza.
+const PRODUCTOS_CUPO: ReadonlySet<ProductoId> = new Set<ProductoId>([
+  "cupo_rotativo",
+  "rotativo_seguros_impuestos",
+]);
+
+export function modalidadDe(producto: ProductoId, contrato: TipoContrato): Modalidad {
+  if (PRODUCTOS_CUPO.has(producto)) return "Cupo";
+  return CONTRATOS_CON_PAGADURIA.has(contrato) ? "Libranza" : "No libranza";
+}
 
 // ---------------------------------------------------------------------------
 // MOTOR DE DECISION CREDITICIA
@@ -72,6 +113,17 @@ export function evaluar(
   }
   razones.push(`Capacidad de cuota adicional estimada: ${money(capacidadCuota)}/mes.`);
 
+  // Tope duro por capacidad de pago (regla del brief).
+  const topeMonto = topePorCapacidad(e.ingresoEstimado);
+  const modalidadBase: Modalidad = CONTRATOS_CON_PAGADURIA.has(e.tipoContrato)
+    ? "Libranza"
+    : "No libranza";
+  razones.push(
+    e.ingresoEstimado <= SMMLV
+      ? `Ingreso hasta 1 SMMLV: tope de ${money(topeMonto)} por libranza.`
+      : `Tope por capacidad: ${TOPE_MULTIPLO_SALARIO}x el salario = ${money(topeMonto)} (modalidad ${modalidadBase.toLowerCase()} o cupo).`
+  );
+
   const sobreendeudado = dti >= DTI_ALERTA && e.entidadesConDeuda >= 2;
   if (sobreendeudado) {
     alertas.push(`Senal de sobreendeudamiento (DTI ${(dti * 100).toFixed(0)}%).`);
@@ -93,6 +145,8 @@ export function evaluar(
       nivelRiesgo,
       dti,
       capacidadCuota,
+      topeMonto,
+      modalidad: modalidadBase,
       productosElegibles: [],
       razones,
       alertas,
@@ -132,6 +186,8 @@ export function evaluar(
       nivelRiesgo,
       dti,
       capacidadCuota,
+      topeMonto,
+      modalidad: modalidadBase,
       productosElegibles: [],
       razones,
       alertas,
@@ -140,6 +196,11 @@ export function evaluar(
 
   // Razon especifica del producto ganador.
   razones.push(motivoProducto(recomendado.id, e, dti, sobreendeudado));
+  if (recomendado.topeAplicado) {
+    razones.push(
+      `Monto recortado al tope por capacidad de pago (${money(topeMonto)}); la cuota daba para mas.`
+    );
+  }
 
   return {
     elegible: true,
@@ -150,6 +211,8 @@ export function evaluar(
     nivelRiesgo,
     dti,
     capacidadCuota,
+    topeMonto,
+    modalidad: recomendado.modalidad,
     productosElegibles: [...productosElegibles].sort((a, b) => b.encaje - a.encaje),
     razones,
     alertas,
@@ -194,11 +257,23 @@ function evaluarProductos(
   alertas: string[]
 ): ProductoElegible[] {
   const out: ProductoElegible[] = [];
+  const tope = topePorCapacidad(e.ingresoEstimado);
+
   const push = (id: ProductoId, montoRaw: number, encaje: number) => {
     const lim = LIMITES_PRODUCTO[id];
-    const monto = roundMonto(clamp(montoRaw, lim.min, lim.max));
+    // El tope por capacidad de pago manda sobre el calculo cuota x plazo.
+    const conTope = PRODUCTOS_SIN_TOPE_SALARIAL.has(id) ? montoRaw : Math.min(montoRaw, tope);
+    const topeAplicado = conTope < montoRaw;
+    const monto = roundMonto(clamp(conTope, lim.min, lim.max));
     if (monto >= lim.min && encaje > 0) {
-      out.push({ id, nombre: lim.nombre, montoSugerido: monto, encaje: clamp(encaje, 0, 100) });
+      out.push({
+        id,
+        nombre: lim.nombre,
+        montoSugerido: monto,
+        encaje: Math.round(clamp(encaje, 0, 100)),
+        modalidad: modalidadDe(id, e.tipoContrato),
+        topeAplicado,
+      });
     }
   };
 
@@ -213,11 +288,13 @@ function evaluarProductos(
     push("compra_cartera", e.saldoDeudaExterna, encaje);
   }
 
-  // Cupo rotativo / consumo: base para casi todos con capacidad.
+  // Cupo rotativo / consumo: base para casi todos con capacidad. Es la opcion
+  // por defecto, asi que su encaje es deliberadamente moderado: cualquier
+  // producto con una senal propia fuerte debe poder ganarle.
   if (capOK) {
-    let encaje = 55 - dti * 40;
+    let encaje = 46 - dti * 40;
     if (e.categoriaAfiliacion === "A" || e.categoriaAfiliacion === "B") encaje += 8;
-    push("cupo_rotativo", capacidadCuota * LIMITES_PRODUCTO.cupo_rotativo.plazoMeses, encaje);
+    push("cupo_rotativo", montoPorCuota(capacidadCuota, "cupo_rotativo"), encaje);
   }
 
   // Libre inversion: hasta 150M, incluso sin historial. Ideal independientes/cat C.
@@ -226,19 +303,27 @@ function evaluarProductos(
     if (e.categoriaAfiliacion === "C") encaje += 15;
     if (e.tipoContrato === "Independiente" && e.tieneNegocio) encaje += 15;
     if (e.entidadesConDeuda === 0) encaje += 10; // sin historial tradicional -> Colsubsidio lo permite
-    push("libre_inversion", capacidadCuota * LIMITES_PRODUCTO.libre_inversion.plazoMeses, encaje);
+    push("libre_inversion", montoPorCuota(capacidadCuota, "libre_inversion"), encaje);
   }
 
-  // Hipotecario: ticket alto, requiere capacidad e ingreso solidos.
+  // Hipotecario: ticket alto, requiere capacidad e ingreso solidos. Los filtros
+  // de entrada ya son la senal fuerte, por eso arranca alto cuando se cumplen.
   if (capacidadCuota >= 800_000 && (e.categoriaAfiliacion === "B" || e.categoriaAfiliacion === "C") && e.scoreBuro >= 600 && !e.embargos) {
-    let encaje = 30 + (e.categoriaAfiliacion === "C" ? 12 : 0) + (e.edad < 55 ? 8 : 0);
-    push("hipotecario", capacidadCuota * LIMITES_PRODUCTO.hipotecario.plazoMeses, encaje);
+    const encaje =
+      48 +
+      (e.categoriaAfiliacion === "C" ? 15 : 0) +
+      (e.edad < 50 ? 10 : 0) +
+      (e.antiguedadMeses >= 36 ? 8 : 0);
+    push("hipotecario", montoPorCuota(capacidadCuota, "hipotecario"), encaje);
   }
 
-  // Educativo: accesible, sirve para jovenes / formacion.
+  // Educativo: la senal es la edad formativa. Para un joven debe ganarle al cupo.
   if (capOK) {
-    let encaje = 22 + (e.edad <= 35 ? 14 : 0);
-    push("educativo", capacidadCuota * LIMITES_PRODUCTO.educativo.plazoMeses, encaje);
+    const encaje =
+      34 +
+      (e.edad <= 30 ? 32 : e.edad <= 35 ? 18 : 0) +
+      (e.categoriaAfiliacion === "A" || e.categoriaAfiliacion === "B" ? 6 : 0);
+    push("educativo", montoPorCuota(capacidadCuota, "educativo"), encaje);
   }
 
   // Credito Mujer: requisitos verificables.
@@ -254,14 +339,36 @@ function evaluarProductos(
     // Producto objetivo con beneficios diferenciales: si la afiliada califica,
     // el motor lo prioriza sobre un cupo generico.
     let encaje = 61 - dti * 20 + (e.tipoContrato === "Independiente" ? 6 : 0);
-    push("credito_mujer", capacidadCuota * LIMITES_PRODUCTO.credito_mujer.plazoMeses, encaje);
+    push("credito_mujer", montoPorCuota(capacidadCuota, "credito_mujer"), encaje);
   } else if (e.genero === "F" && e.embargos) {
     alertas.push("Credito Mujer no disponible: reporta embargos.");
   }
 
-  // Rotativo seguros e impuestos: complementario, para quienes ya tienen consumo.
+  // Credito complementario: linea adicional para el afiliado que ya se mueve en
+  // el mercado con una sola obligacion sana. Senal: afiliado, 1-2 entidades,
+  // DTI holgado y sin mora.
+  if (
+    capOK &&
+    e.afiliado &&
+    e.moraDias === 0 &&
+    e.entidadesConDeuda >= 1 &&
+    e.entidadesConDeuda <= 2 &&
+    dti < DTI_ALERTA
+  ) {
+    const encaje =
+      44 + (e.antiguedadMeses >= 24 ? 10 : 0) + (e.scoreBuro >= 650 ? 8 : 0);
+    push("complementario", montoPorCuota(capacidadCuota, "complementario"), encaje);
+  }
+
+  // Rotativo seguros e impuestos: la senal es tener que pagar predial, vehiculo
+  // o polizas. Sin esa senal queda como alternativa de bajo encaje, para que el
+  // proposito declarado lo siga alcanzando.
   if (capOK && e.categoriaAfiliacion !== "D") {
-    push("rotativo_seguros_impuestos", capacidadCuota * 8, 18);
+    const tienePatrimonio = e.categoriaAfiliacion === "C" || e.tieneNegocio;
+    const encaje = tienePatrimonio
+      ? 40 + (e.categoriaAfiliacion === "C" ? 18 : 0) + (e.tieneNegocio ? 10 : 0)
+      : 18;
+    push("rotativo_seguros_impuestos", montoPorCuota(capacidadCuota, "rotativo_seguros_impuestos"), encaje);
   }
 
   return out;
@@ -274,6 +381,7 @@ const PROPOSITO_A_PRODUCTO: Record<Exclude<Proposito, "auto">, ProductoId> = {
   educacion: "educativo",
   libre: "libre_inversion",
   unificar: "compra_cartera",
+  complementario: "complementario",
   seguros_impuestos: "rotativo_seguros_impuestos",
 };
 
@@ -284,6 +392,7 @@ const LABEL_PROPOSITO: Record<Proposito, string> = {
   educacion: "Educacion",
   libre: "Libre inversion",
   unificar: "Unificar deudas",
+  complementario: "Credito complementario",
   seguros_impuestos: "Seguros e impuestos",
 };
 
@@ -308,6 +417,8 @@ function motivoProducto(
       return "Credito educativo: monto accesible para financiar formacion; encaja con el perfil de edad/ingreso.";
     case "credito_mujer":
       return "Credito Mujer: cumple edad, ingreso, afiliacion vigente y ausencia de embargos; incluye beneficios adicionales.";
+    case "complementario":
+      return `Credito complementario: afiliado al dia con ${e.entidadesConDeuda} obligacion(es) y DTI ${(dti * 100).toFixed(0)}%; admite una linea adicional sin comprometer la capacidad.`;
     case "cupo_rotativo":
       return `Cupo rotativo: DTI ${(dti * 100).toFixed(0)}% permite un cupo reutilizable para consumo recurrente.`;
     case "rotativo_seguros_impuestos":

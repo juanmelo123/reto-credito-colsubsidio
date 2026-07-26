@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { EnrichResponse, Proposito, PerfilCompleto } from "@/lib/types";
 import { generarCedulasEjemplo } from "@/lib/synthetic";
+import { parsearInsumo } from "@/lib/insumo";
 import { formatCOP, formatCOPCompact, formatPercent } from "@/lib/format";
 import { RiskBadge, CatBadge, DistBars } from "./shared";
 
@@ -13,8 +14,17 @@ const PROPOSITOS: { value: Proposito; label: string }[] = [
   { value: "vivienda", label: "Vivienda" },
   { value: "educacion", label: "Educacion" },
   { value: "unificar", label: "Unificar deudas" },
+  { value: "complementario", label: "Credito complementario" },
   { value: "seguros_impuestos", label: "Seguros e impuestos" },
 ];
+
+const LABEL_COLUMNA: Record<string, string> = {
+  cedula: "cedula",
+  nombre: "nombre",
+  correo: "correo",
+  direccion: "direccion",
+  categoriaAfiliacion: "categoria",
+};
 
 type SortKey =
   | "cedula"
@@ -25,6 +35,18 @@ type SortKey =
   | "score"
   | "producto"
   | "monto";
+
+// Insumo de ejemplo con los 5 campos del brief, para demostrar que las columnas
+// que trae el usuario se respetan en vez de sintetizarse.
+const CSV_EJEMPLO = [
+  "cedula,nombre,correo,direccion,categoria",
+  "1028404676,Luz Garcia Cortes,luz.garcia@correo.com,Calle 93 # 15 - 20 Bogota,B",
+  "1022383083,David Quintero Suarez,dquintero@empresa.com,Carrera 7 # 116 - 40 Bogota,C",
+  "1051570194,David Felipe Cortes,dfcortes@correo.com,Diagonal 40 # 22 - 11 Medellin,A",
+  "1016625206,Claudia Rodriguez Gonzalez,claudia.rg@correo.com,Transversal 5 # 45 - 09 Cali,A",
+  "82946156,Mauricio Ospina Quintero,m.ospina@empresa.com,Avenida Calle 26 # 68 - 35 Bogota,C",
+  "28247876,Gloria Mejia Herrera,gloria.mejia@correo.com,Calle 12 # 3 - 44 Bucaramanga,A",
+].join("\n");
 
 export default function LotePanel() {
   const [texto, setTexto] = useState("");
@@ -37,12 +59,9 @@ export default function LotePanel() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function parseCedulas(t: string): string[] {
-    const tokens = t.split(/[^\d]+/).filter((x) => x.length >= 6 && x.length <= 10);
-    return Array.from(new Set(tokens));
-  }
-
-  const cedulasDetectadas = useMemo(() => parseCedulas(texto).length, [texto]);
+  // Lee el insumo tal como lo trae el usuario: CSV con encabezado o lista pelada.
+  const insumo = useMemo(() => parsearInsumo(texto), [texto]);
+  const columnasExtra = insumo.columnasDetectadas.filter((c) => c !== "cedula");
 
   function usarEjemplo(n: number) {
     setTexto(generarCedulasEjemplo(n).join("\n"));
@@ -63,8 +82,8 @@ export default function LotePanel() {
   }
 
   async function procesar() {
-    const cedulas = parseCedulas(texto);
-    if (cedulas.length === 0) {
+    const { registros } = insumo;
+    if (registros.length === 0) {
       setError("No se detectaron cedulas (numeros de 6 a 10 digitos) en el insumo.");
       return;
     }
@@ -74,7 +93,7 @@ export default function LotePanel() {
       const res = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cedulas, proposito }),
+        body: JSON.stringify({ registros, proposito }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error en la consulta");
@@ -113,7 +132,9 @@ export default function LotePanel() {
       "cedula",
       "nombre",
       "ciudad",
+      "direccion",
       "correo",
+      "instagram",
       "genero",
       "edad",
       "vinculo",
@@ -131,6 +152,9 @@ export default function LotePanel() {
       "elegible",
       "producto_recomendado",
       "monto_sugerido",
+      "modalidad",
+      "tope_capacidad",
+      "campos_del_insumo",
     ];
     const lines = data.results.map((p) => {
       const e = p.exogenos;
@@ -139,7 +163,9 @@ export default function LotePanel() {
         e.cedula,
         `"${e.nombre}"`,
         e.ciudad,
+        `"${e.direccion}"`,
         e.correo,
+        e.instagram ?? "",
         e.genero,
         e.edad,
         `"${e.tipoContrato}"`,
@@ -157,6 +183,9 @@ export default function LotePanel() {
         r.elegible ? "SI" : "NO",
         `"${r.nombreProducto}"`,
         r.montoSugerido,
+        r.modalidad,
+        r.topeMonto,
+        `"${e.camposDeInsumo.join(" ")}"`,
       ].join(",");
     });
     const csv = [header.join(","), ...lines].join("\n");
@@ -173,11 +202,12 @@ export default function LotePanel() {
     <div>
       <div className="card card-pad">
         <label className="field-label" htmlFor="lote">
-          Insumo: cedulas (una por linea, separadas por coma, o pega/sube un CSV)
+          Insumo: lista de cedulas, o CSV con encabezado (cedula, nombre, correo, direccion,
+          categoria). Las columnas que traigas se respetan; el resto se enriquece.
         </label>
         <textarea
           id="lote"
-          placeholder={"1024587963\n52830147\n79004521\n..."}
+          placeholder={"cedula,nombre,correo,direccion,categoria\n1024587963,...\n\n(o solo cedulas, una por linea)"}
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);
@@ -195,6 +225,16 @@ export default function LotePanel() {
             onChange={handleFile}
             style={{ display: "none" }}
           />
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              setTexto(CSV_EJEMPLO);
+              setFileName(null);
+              setData(null);
+            }}
+          >
+            Ejemplo CSV con columnas
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={() => usarEjemplo(500)}>
             Ejemplo 500
           </button>
@@ -221,7 +261,12 @@ export default function LotePanel() {
         <div className="row" style={{ justifyContent: "space-between" }}>
           <p className="hint" style={{ margin: 0 }}>
             {fileName ? `Archivo: ${fileName} · ` : ""}
-            {cedulasDetectadas} cedula(s) detectada(s) en el insumo.
+            {insumo.registros.length} cedula(s) detectada(s) en el insumo.
+            {columnasExtra.length > 0
+              ? ` Columnas propias respetadas: ${columnasExtra
+                  .map((c) => LABEL_COLUMNA[c] ?? c)
+                  .join(", ")}.`
+              : " Sin columnas propias: todo se enriquece."}
           </p>
         </div>
         {error && <div className="error-box">{error}</div>}
@@ -239,6 +284,10 @@ export default function LotePanel() {
             />
             <Stat value={String(data.resumen.noElegibles)} label="No elegibles" />
             <Stat value={formatCOPCompact(data.resumen.ingresoPromedio)} label="Ingreso promedio" />
+            <Stat
+              value={String(data.resumen.camposDeInsumo)}
+              label="Con datos propios del insumo"
+            />
           </div>
 
           <div className="dist-grid">
@@ -253,6 +302,10 @@ export default function LotePanel() {
             <div className="card card-pad">
               <p className="card-title">Nivel de riesgo</p>
               <DistBars data={data.resumen.distribucionRiesgo} color="#5b7fa6" />
+            </div>
+            <div className="card card-pad">
+              <p className="card-title">Modalidad</p>
+              <DistBars data={data.resumen.distribucionModalidad} color="#7a6ea6" />
             </div>
           </div>
 
@@ -313,7 +366,10 @@ export default function LotePanel() {
                         <span className="badge badge-alto">No elegible</span>
                       )}
                     </td>
-                    <td>{row.producto}</td>
+                    <td>
+                      {row.producto}
+                      {row.elegible && <span className="t-sub">{row.modalidad}</span>}
+                    </td>
                     <td className="t-num">{row.monto > 0 ? formatCOP(row.monto) : "—"}</td>
                   </tr>
                 ))}
@@ -335,6 +391,7 @@ type FlatRow = {
   score: number;
   producto: string;
   monto: number;
+  modalidad: string;
   riesgo: PerfilCompleto["recomendacion"]["nivelRiesgo"];
   elegible: boolean;
 };
@@ -349,6 +406,7 @@ function flatten(p: PerfilCompleto): FlatRow {
     score: p.recomendacion.score,
     producto: p.recomendacion.elegible ? p.recomendacion.nombreProducto : "No elegible",
     monto: p.recomendacion.montoSugerido,
+    modalidad: p.recomendacion.elegible ? p.recomendacion.modalidad : "—",
     riesgo: p.recomendacion.nivelRiesgo,
     elegible: p.recomendacion.elegible,
   };
