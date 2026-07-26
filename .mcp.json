@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "reto-credito": {
+      "command": "npx",
+      "args": ["tsx", "bin/mcp.ts"]
+    }
+  }
+}

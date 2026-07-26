@@ -28,6 +28,54 @@ export function procesarCedula(
   return procesarRegistro({ cedula }, proposito, proveedor);
 }
 
+// Una fila por registro con lo que sirve para analizar cartera. El perfil
+// completo trae los criterios de los 8 productos: util en pantalla, ruidoso
+// cuando lo que se quiere es mirar 2.000 registros de un golpe.
+export interface FilaCompacta {
+  cedula: string;
+  nombre: string;
+  edad: number;
+  ciudad: string;
+  categoria: string;
+  ingreso: number;
+  dti: number;
+  scoreBuro: number;
+  score: number;
+  riesgo: string;
+  elegible: boolean;
+  producto: string | null;
+  afinidad: number;
+  monto: number;
+  modalidad: string;
+  // Deuda externa: lo que sustenta una oportunidad de compra de cartera.
+  entidadesConDeuda: number;
+  saldoDeudaExterna: number;
+  alertas: string[];
+}
+
+export function filaCompacta({ exogenos: e, recomendacion: r }: PerfilCompleto): FilaCompacta {
+  return {
+    cedula: e.cedula,
+    nombre: e.nombre,
+    edad: e.edad,
+    ciudad: e.ciudad,
+    categoria: e.categoriaAfiliacion,
+    ingreso: e.ingresoEstimado,
+    dti: Number(r.dti.toFixed(3)),
+    scoreBuro: e.scoreBuro,
+    score: r.score,
+    riesgo: r.nivelRiesgo,
+    elegible: r.elegible,
+    producto: r.productoRecomendado,
+    afinidad: r.productos.find((p) => p.id === r.productoRecomendado)?.afinidad ?? 0,
+    monto: r.montoSugerido,
+    modalidad: r.modalidad,
+    entidadesConDeuda: e.entidadesConDeuda,
+    saldoDeudaExterna: e.saldoDeudaExterna,
+    alertas: r.alertas,
+  };
+}
+
 // Procesa un lote y arma el resumen agregado.
 export function procesarLote(
   registros: RegistroEntrada[],
